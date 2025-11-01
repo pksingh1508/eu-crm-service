@@ -22,6 +22,17 @@ const LEAD_STATUSES = [
 type SearchParams = {
   status?: string
   query?: string
+  page?: string
+}
+
+const PAGE_SIZE = 20
+
+type TeamLeadResult = {
+  leads: TeamLeadRow[]
+  page: number
+  totalPages: number | null
+  hasNext: boolean
+  hasPrevious: boolean
 }
 
 type TeamLeadRow = {
@@ -34,19 +45,23 @@ type TeamLeadRow = {
 }
 
 const fetchTeamLeads = async (
-  userId: string,
   searchParams: SearchParams
-): Promise<TeamLeadRow[]> => {
+): Promise<TeamLeadResult> => {
   const supabaseAdmin = getSupabaseAdminClient()
   const query = searchParams.query?.trim() ?? ""
   const status = searchParams.status ?? "all"
+  const rawPage = Number.parseInt(searchParams.page ?? "1", 10)
+  const page = Number.isNaN(rawPage) || rawPage < 1 ? 1 : rawPage
+  const from = (page - 1) * PAGE_SIZE
+  const to = from + PAGE_SIZE - 1
 
   let leadsQuery = supabaseAdmin
     .from("leads")
-    .select("id, name, email, company, status, updated_at")
-    .eq("assigned_to", userId)
+    .select("id, name, email, company, status, updated_at", {
+      count: "exact"
+    })
     .order("updated_at", { ascending: false })
-    .limit(100)
+    .range(from, to)
 
   if (query.length > 0) {
     const like = `%${query}%`
@@ -59,21 +74,42 @@ const fetchTeamLeads = async (
     leadsQuery = leadsQuery.eq("status", status)
   }
 
-  const { data, error } = await leadsQuery
+  const { data, error, count } = await leadsQuery
 
   if (error) {
     console.error("[team-leads] failed to load leads", error)
-    return []
+    return {
+      leads: [],
+      page,
+      totalPages: count != null
+        ? Math.max(1, Math.ceil(count / PAGE_SIZE))
+        : null,
+      hasNext: false,
+      hasPrevious: page > 1
+    }
   }
 
-  return (data ?? []) as unknown as TeamLeadRow[]
+  const leads = (data ?? []) as unknown as TeamLeadRow[]
+  const totalPages =
+    count != null ? Math.max(1, Math.ceil(count / PAGE_SIZE)) : null
+  const hasNext = totalPages != null ? page < totalPages : leads.length === PAGE_SIZE
+  const hasPrevious = page > 1
+
+  return {
+    leads,
+    page,
+    totalPages,
+    hasNext,
+    hasPrevious
+  }
 }
 
 const TeamLeadsPage = async ({
   searchParams
 }: {
-  searchParams: SearchParams
+  searchParams: Promise<SearchParams>
 }) => {
+  const resolvedSearchParams = await searchParams
   const supabase = await getSupabaseServerClient()
   const {
     data: { user },
@@ -88,7 +124,28 @@ const TeamLeadsPage = async ({
     redirect("/login")
   }
 
-  const leads = await fetchTeamLeads(user.id, searchParams)
+  const {
+    leads,
+    page: currentPage,
+    totalPages,
+    hasNext,
+    hasPrevious
+  } = await fetchTeamLeads(resolvedSearchParams)
+
+  const buildPageLink = (page: number) => {
+    const params = new URLSearchParams()
+    if (resolvedSearchParams.query) {
+      params.set("query", resolvedSearchParams.query)
+    }
+    if (resolvedSearchParams.status) {
+      params.set("status", resolvedSearchParams.status)
+    }
+    if (page > 1) {
+      params.set("page", page.toString())
+    }
+    const queryString = params.toString()
+    return queryString ? `/team/leads?${queryString}` : "/team/leads"
+  }
 
   return (
     <div className="space-y-6">
@@ -111,15 +168,15 @@ const TeamLeadsPage = async ({
             id="query"
             name="query"
             placeholder="Search by name or company..."
-            defaultValue={searchParams.query ?? ""}
+            defaultValue={resolvedSearchParams.query ?? ""}
           />
         </div>
         <div className="grid gap-2">
           <Label htmlFor="status">Status</Label>
-          <Select name="status" defaultValue={searchParams.status ?? "all"}>
-            <SelectTrigger id="status">
-              <SelectValue placeholder="All statuses" />
-            </SelectTrigger>
+            <Select name="status" defaultValue={resolvedSearchParams.status ?? "all"}>
+              <SelectTrigger id="status">
+                <SelectValue placeholder="All statuses" />
+              </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
               {LEAD_STATUSES.map((status) => (
@@ -191,6 +248,33 @@ const TeamLeadsPage = async ({
         emptyMessage="No leads found. Update your filters or check back later."
         rowKey={(row) => row.id}
       />
+
+      <div className="flex flex-col gap-3 border-t border-slate-200 pt-4 md:flex-row md:items-center md:justify-between">
+        <p className="text-sm text-slate-600">
+          Page {currentPage}
+          {totalPages ? ` of ${totalPages}` : ""}
+        </p>
+        <div className="flex gap-2">
+          {hasPrevious ? (
+            <Button variant="outline" asChild>
+              <Link href={buildPageLink(currentPage - 1)}>Previous</Link>
+            </Button>
+          ) : (
+            <Button variant="outline" disabled>
+              Previous
+            </Button>
+          )}
+          {hasNext ? (
+            <Button variant="outline" asChild>
+              <Link href={buildPageLink(currentPage + 1)}>Next</Link>
+            </Button>
+          ) : (
+            <Button variant="outline" disabled>
+              Next
+            </Button>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

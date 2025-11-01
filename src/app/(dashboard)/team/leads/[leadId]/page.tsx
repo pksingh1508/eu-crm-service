@@ -1,58 +1,58 @@
-﻿import { redirect } from "next/navigation"
+﻿import { redirect } from "next/navigation";
 
-import EmailComposer from "./ui/email-composer"
-import LeadTimeline from "./ui/lead-timeline"
-import SendEmailButton from "./ui/send-email-button"
-import { emailTemplates } from "@/constants/email-templates"
-import { getSupabaseAdminClient } from "@/lib/supabase/admin"
-import { getSupabaseServerClient } from "@/lib/supabase/server"
+import EmailComposer from "./ui/email-composer";
+import LeadTimeline from "./ui/lead-timeline";
+import SendEmailButton from "./ui/send-email-button";
+import { emailTemplates } from "@/constants/email-templates";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
 
 type LeadDetails = {
-  id: string
-  name: string
-  email: string | null
-  company: string | null
-  phone: string | null
-  notes: string | null
-  status: string
-  source: Record<string, any> | null
-  assigned_to: string | null
-  created_at: string
-  updated_at: string
-}
+  id: string;
+  name: string;
+  email: string | null;
+  company: string | null;
+  phone: string | null;
+  notes: string | null;
+  status: string;
+  source: Record<string, any> | null;
+  assigned_to: string | null;
+  created_at: string;
+  updated_at: string;
+};
 
 type LeadEventRow = {
-  id: string
-  event_type: string
-  payload: Record<string, any> | null
-  created_at: string
+  id: string;
+  event_type: string;
+  payload: Record<string, any> | null;
+  created_at: string;
   profiles: {
-    full_name: string | null
-    email: string | null
-  } | null
-}
+    full_name: string | null;
+    email: string | null;
+  } | null;
+};
 
 const LeadDetailPage = async ({
   params
 }: {
-  params: Promise<{ leadId: string }>
+  params: Promise<{ leadId: string }>;
 }) => {
-  const resolvedParams = await params
-  const supabase = await getSupabaseServerClient()
+  const resolvedParams = await params;
+  const supabase = await getSupabaseServerClient();
   const {
     data: { user },
     error: userError
-  } = await supabase.auth.getUser()
+  } = await supabase.auth.getUser();
 
   if (userError) {
-    console.error("[team-lead-detail] failed to verify auth user", userError)
+    console.error("[team-lead-detail] failed to verify auth user", userError);
   }
 
   if (!user) {
-    redirect("/login")
+    redirect("/login");
   }
 
-  const supabaseAdmin = getSupabaseAdminClient()
+  const supabaseAdmin = getSupabaseAdminClient();
 
   const { data: leadData, error: leadError } = await supabaseAdmin
     .from("leads")
@@ -60,22 +60,18 @@ const LeadDetailPage = async ({
       "id, name, email, company, phone, notes, status, source, assigned_to, created_at, updated_at"
     )
     .eq("id", resolvedParams.leadId)
-    .maybeSingle()
+    .maybeSingle();
 
   if (leadError) {
-    console.error("[team-lead-detail] load error", leadError)
-    redirect("/team/leads")
+    console.error("[team-lead-detail] load error", leadError);
+    redirect("/team/leads");
   }
 
   if (!leadData) {
-    redirect("/team/leads")
+    redirect("/team/leads");
   }
 
-  const lead = leadData as LeadDetails
-
-  if (lead.assigned_to !== user.id) {
-    redirect("/team/leads")
-  }
+  const lead = leadData as LeadDetails;
 
   const [{ data: eventsData }, { data: profileData }] = await Promise.all([
     supabaseAdmin
@@ -90,10 +86,10 @@ const LeadDetailPage = async ({
       .select("workspace_email_id")
       .eq("id", user.id)
       .maybeSingle()
-  ])
+  ]);
 
-  const events = (eventsData ?? []) as unknown as LeadEventRow[]
-  const workspaceEmailId = profileData?.workspace_email_id ?? null
+  const events = (eventsData ?? []) as unknown as LeadEventRow[];
+  const workspaceEmailId = profileData?.workspace_email_id ?? null;
 
   const leadInfoItems = [
     { label: "Email", value: lead.email ?? "—" },
@@ -104,27 +100,20 @@ const LeadDetailPage = async ({
       label: "Last updated",
       value: new Date(lead.updated_at).toLocaleString()
     }
-  ]
+  ];
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div>
-          <p className="text-sm uppercase tracking-wide text-slate-500">
-            Lead
-          </p>
-          <h1 className="text-3xl font-semibold text-slate-900">
-            {lead.name}
-          </h1>
+          <p className="text-sm uppercase tracking-wide text-slate-500">Lead</p>
+          <h1 className="text-3xl font-semibold text-slate-900">{lead.name}</h1>
           <p className="mt-2 text-sm text-slate-600">
             {lead.notes ?? "No notes yet. Add context as you progress."}
           </p>
         </div>
         <div className="flex flex-col items-start gap-2 md:items-end">
-          <SendEmailButton
-            leadId={lead.id}
-            disabled={!workspaceEmailId}
-          />
+          <SendEmailButton leadId={lead.id} disabled={!workspaceEmailId} />
           {!workspaceEmailId ? (
             <p className="text-xs text-rose-600">
               No workspace mailbox assigned. Please contact an administrator.
@@ -172,7 +161,7 @@ const LeadDetailPage = async ({
         templates={emailTemplates}
       />
     </div>
-  )
-}
+  );
+};
 
-export default LeadDetailPage
+export default LeadDetailPage;

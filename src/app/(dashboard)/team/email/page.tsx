@@ -23,8 +23,9 @@ type SearchParams = {
 const EmailCenterPage = async ({
   searchParams
 }: {
-  searchParams: SearchParams
+  searchParams: Promise<SearchParams>
 }) => {
+  const resolvedSearchParams = await searchParams
   const supabase = await getSupabaseServerClient()
   const {
     data: { user },
@@ -50,7 +51,7 @@ const EmailCenterPage = async ({
 
   const events = (eventsData ?? []) as unknown as EmailEventRow[]
 
-  const query = searchParams.query?.trim().toLowerCase() ?? ""
+  const query = resolvedSearchParams.query?.trim().toLowerCase() ?? ""
   const filteredEvents =
     query.length === 0
       ? events
@@ -85,7 +86,7 @@ const EmailCenterPage = async ({
           <Input
             id="query"
             name="query"
-            defaultValue={searchParams.query ?? ""}
+            defaultValue={resolvedSearchParams.query ?? ""}
             placeholder="Search by lead or subject..."
             className="mt-1"
           />

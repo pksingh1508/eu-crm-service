@@ -2,6 +2,7 @@
 
 import { z } from "zod"
 
+import { env } from "@/lib/env"
 import { getSupabaseAdminClient } from "@/lib/supabase/admin"
 import { getSupabaseServerClient } from "@/lib/supabase/server"
 
@@ -39,7 +40,10 @@ export type InviteTeamMemberState = {
 }
 
 const inviteSchema = z.object({
-  email: z.string().email("Enter a valid email address.")
+  email: z
+    .string()
+    .email("Enter a valid email address.")
+    .transform((value) => value.trim().toLowerCase())
 })
 
 export const inviteTeamMemberAction = async (
@@ -59,10 +63,27 @@ export const inviteTeamMemberAction = async (
 
   try {
     const { supabaseAdmin } = await ensureAdmin()
+
+    const { data: existingAuthUser } = await supabaseAdmin
+      .from("auth.users")
+      .select("id")
+      .eq("email", parsed.data.email)
+      .maybeSingle()
+
+    if (existingAuthUser) {
+      return {
+        success: false,
+        error: "This email is already registered or has a pending invite."
+      }
+    }
+
+    const redirectTo = `${env.NEXT_PUBLIC_APP_URL}/auth/login`
+
     const { error } = await supabaseAdmin.auth.admin.inviteUserByEmail(
       parsed.data.email,
       {
-        data: { role: "team" }
+        data: { role: "team" },
+        redirectTo
       }
     )
 
@@ -73,12 +94,18 @@ export const inviteTeamMemberAction = async (
     return { success: true }
   } catch (error) {
     console.error("[team] invite failed", error)
+
+    const authErrorMessage =
+      error instanceof Error ? error.message : "Unable to invite user. Try again later."
+
+    const friendlyMessage =
+      authErrorMessage === "Database error saving new user"
+        ? "Unable to create invite in Supabase auth. Check if the email is already in use or inspect Supabase logs for details."
+        : authErrorMessage
+
     return {
       success: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : "Unable to invite user. Try again later."
+      error: friendlyMessage
     }
   }
 }
@@ -223,4 +250,3 @@ export const removeTeamMemberAction = async (
     }
   }
 }
-

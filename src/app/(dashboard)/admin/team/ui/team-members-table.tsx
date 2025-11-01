@@ -1,8 +1,7 @@
 
 'use client'
 
-import { useEffect } from "react"
-import { useFormState } from "react-dom"
+import { useActionState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 
 import {
@@ -112,11 +111,11 @@ const TeamMemberRow = ({
 }) => {
   const router = useRouter()
 
-  const [assignmentState, assignmentAction] = useFormState(
+  const [assignmentState, assignmentAction] = useActionState(
     updateTeamAssignmentAction,
     assignmentInitialState
   )
-  const [removeState, removeAction] = useFormState(
+  const [removeState, removeAction] = useActionState(
     removeTeamMemberAction,
     removeInitialState
   )
