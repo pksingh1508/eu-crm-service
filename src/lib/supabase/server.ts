@@ -20,6 +20,18 @@ export const getSupabaseServerClient = async () => {
           try {
             cookieStore.set({ name, value, ...(options ?? {}) })
           } catch (error) {
+            if (
+              error instanceof Error &&
+              error.message.includes("Cookies can only be modified")
+            ) {
+              if (process.env.NODE_ENV !== "production") {
+                console.debug(
+                  "[supabase] cookie write skipped outside of a server action or route handler."
+                )
+              }
+              return
+            }
+
             if (process.env.NODE_ENV !== "production") {
               console.warn(
                 "[supabase] unable to set cookie in this context. Ignoring.",
@@ -36,6 +48,18 @@ export const getSupabaseServerClient = async () => {
               cookieStore.delete(name)
             }
           } catch (error) {
+            if (
+              error instanceof Error &&
+              error.message.includes("Cookies can only be modified")
+            ) {
+              if (process.env.NODE_ENV !== "production") {
+                console.debug(
+                  "[supabase] cookie delete skipped outside of a server action or route handler."
+                )
+              }
+              return
+            }
+
             if (process.env.NODE_ENV !== "production") {
               console.warn(
                 "[supabase] unable to remove cookie in this context. Ignoring.",

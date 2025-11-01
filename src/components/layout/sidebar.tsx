@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
+import { useTransition } from "react"
 import {
   BarChart3,
   Inbox,
@@ -12,6 +13,8 @@ import {
 
 import { cn } from "@/lib/utils"
 import { useAuthStore, type UserRole } from "@/stores/auth-store"
+import { logoutAction } from "@/server/auth/actions"
+import { Button } from "@/components/ui/button"
 
 type NavItem = {
   href: string
@@ -118,8 +121,23 @@ const SidebarNavItem = ({ item }: { item: NavItem }) => {
 const Sidebar = () => {
   const role = useAuthStore((state) => state.role)
   const isInitialized = useAuthStore((state) => state.isInitialized)
+  const clearAuth = useAuthStore((state) => state.clear)
+  const router = useRouter()
+  const [isLoggingOut, startLogout] = useTransition()
 
   const navItems = role ? NAVIGATION[role] : []
+
+  const handleLogout = () => {
+    startLogout(async () => {
+      try {
+        await logoutAction()
+        clearAuth()
+        router.push("/login")
+      } catch (error) {
+        console.error("[sidebar] logout failed", error)
+      }
+    })
+  }
 
   return (
     <aside className="hidden w-72 shrink-0 border-r border-slate-200 bg-white/80 backdrop-blur md:flex md:flex-col">
@@ -152,8 +170,19 @@ const Sidebar = () => {
           </div>
         )}
       </nav>
-      <div className="px-4 pb-6 text-xs text-slate-400">
-        &copy; {new Date().getFullYear()} EU Careers Serwis
+      <div className="px-4 pb-6">
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full justify-center gap-2 text-sm font-semibold"
+          onClick={handleLogout}
+          disabled={isLoggingOut}
+        >
+          {isLoggingOut ? "Signing out..." : "Log out"}
+        </Button>
+        <p className="mt-4 text-xs text-slate-400">
+          &copy; {new Date().getFullYear()} EU Careers Serwis
+        </p>
       </div>
     </aside>
   )
