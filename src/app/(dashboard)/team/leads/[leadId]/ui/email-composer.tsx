@@ -162,124 +162,130 @@ const EmailComposer = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={closeEmailComposer}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Send email to {lead.name ?? lead.email}</DialogTitle>
-          <DialogDescription>
-            Use a template or write from scratch. Emails send via your assigned workspace mailbox.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <div className="grid gap-2">
-            <label className="text-sm font-medium text-slate-700">
-              Template
-            </label>
-            <Select
-              value={selectedTemplateId ?? ""}
-              onValueChange={handleTemplateChange}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Choose a template (optional)" />
-              </SelectTrigger>
-              <SelectContent>
-                {templates.map((template) => (
-                  <SelectItem key={template.id} value={template.id}>
-                    {template.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+      <DialogContent className="max-w-2xl sm:max-w-3xl w-[95vw] overflow-hidden p-0">
+        <div className="flex max-h-[calc(100vh-4rem)] flex-col">
+          <div className="space-y-2 border-b border-slate-200 p-6">
+            <DialogHeader className="space-y-2">
+              <DialogTitle>Send email to {lead.name ?? lead.email}</DialogTitle>
+              <DialogDescription>
+                Use a template or write from scratch. Emails send via your assigned workspace mailbox.
+              </DialogDescription>
+            </DialogHeader>
           </div>
 
-          <div className="grid gap-2">
-            <label htmlFor="subject" className="text-sm font-medium text-slate-700">
-              Subject
-            </label>
-            <Input
-              id="subject"
-              value={subject}
-              onChange={(event) => setSubject(event.target.value)}
-              placeholder="Email subject"
-            />
-          </div>
+          <div className="flex-1 overflow-y-auto px-6 pb-6">
+            <div className="space-y-4 pb-4">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-slate-700">
+                  Template
+                </label>
+                <Select
+                  value={selectedTemplateId ?? ""}
+                  onValueChange={handleTemplateChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a template (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {templates.map((template) => (
+                      <SelectItem key={template.id} value={template.id}>
+                        {template.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-          <div className="grid gap-2">
-            <label htmlFor="textBody" className="text-sm font-medium text-slate-700">
-              Plain text body
-            </label>
-            <Textarea
-              id="textBody"
-              value={textBody}
-              onChange={(event) => setTextBody(event.target.value)}
-              rows={6}
-              placeholder="Compose your message..."
-            />
-          </div>
+              <div className="grid gap-2">
+                <label htmlFor="subject" className="text-sm font-medium text-slate-700">
+                  Subject
+                </label>
+                <Input
+                  id="subject"
+                  value={subject}
+                  onChange={(event) => setSubject(event.target.value)}
+                  placeholder="Email subject"
+                />
+              </div>
 
-          <div className="grid gap-2">
-            <label htmlFor="htmlBody" className="text-sm font-medium text-slate-700">
-              HTML body (optional)
-            </label>
-            <Textarea
-              id="htmlBody"
-              value={htmlBody}
-              onChange={(event) => setHtmlBody(event.target.value)}
-              rows={6}
-              placeholder="<p>Hello...</p>"
-            />
-          </div>
+              <div className="grid gap-2">
+                <label htmlFor="textBody" className="text-sm font-medium text-slate-700">
+                  Plain text body
+                </label>
+                <Textarea
+                  id="textBody"
+                  value={textBody}
+                  onChange={(event) => setTextBody(event.target.value)}
+                  rows={6}
+                  placeholder="Compose your message..."
+                />
+              </div>
 
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Preview
-            </p>
-            <div className="mt-2 grid gap-4">
-              <div>
-                <p className="text-xs font-medium text-slate-500">Plain text</p>
-                <div className="mt-1 whitespace-pre-wrap rounded-md bg-white p-3 text-sm text-slate-700 shadow-inner">
-                  {textBody.trim().length > 0
-                    ? textBody
-                    : "Start typing above or choose a template to generate content."}
+              <div className="grid gap-2">
+                <label htmlFor="htmlBody" className="text-sm font-medium text-slate-700">
+                  HTML body (optional)
+                </label>
+                <Textarea
+                  id="htmlBody"
+                  value={htmlBody}
+                  onChange={(event) => setHtmlBody(event.target.value)}
+                  rows={6}
+                  placeholder="<p>Hello...</p>"
+                />
+              </div>
+
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Preview
+                </p>
+                <div className="mt-2 grid gap-4">
+                  <div>
+                    <p className="text-xs font-medium text-slate-500">Plain text</p>
+                    <div className="mt-1 whitespace-pre-wrap rounded-md bg-white p-3 text-sm text-slate-700 shadow-inner">
+                      {textBody.trim().length > 0
+                        ? textBody
+                        : "Start typing above or choose a template to generate content."}
+                    </div>
+                  </div>
+                  {htmlBody.trim().length > 0 ? (
+                    <div>
+                      <p className="text-xs font-medium text-slate-500">HTML</p>
+                      <div
+                        className="mt-1 rounded-md bg-white p-3 text-sm text-slate-700 shadow-inner"
+                        dangerouslySetInnerHTML={{ __html: htmlBody }}
+                      />
+                    </div>
+                  ) : null}
                 </div>
               </div>
-              {htmlBody.trim().length > 0 ? (
-                <div>
-                  <p className="text-xs font-medium text-slate-500">HTML</p>
-                  <div
-                    className="mt-1 rounded-md bg-white p-3 text-sm text-slate-700 shadow-inner"
-                    dangerouslySetInnerHTML={{ __html: htmlBody }}
-                  />
-                </div>
+
+              {error ? (
+                <p className="text-sm text-rose-600">{error}</p>
+              ) : null}
+              {feedback ? (
+                <p className="text-sm text-emerald-600">{feedback}</p>
               ) : null}
             </div>
           </div>
 
-          {error ? (
-            <p className="text-sm text-rose-600">{error}</p>
-          ) : null}
-          {feedback ? (
-            <p className="text-sm text-emerald-600">{feedback}</p>
-          ) : null}
+          <DialogFooter className="flex shrink-0 items-center justify-between gap-2 border-t border-slate-200 px-6 py-4">
+            <Button
+              variant="outline"
+              type="button"
+              onClick={closeEmailComposer}
+              disabled={isSending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSend}
+              disabled={isSending || !workspaceEmailId}
+            >
+              {isSending ? "Sending..." : "Send email"}
+            </Button>
+          </DialogFooter>
         </div>
-
-        <DialogFooter className="flex items-center justify-between gap-2">
-          <Button
-            variant="outline"
-            type="button"
-            onClick={closeEmailComposer}
-            disabled={isSending}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            onClick={handleSend}
-            disabled={isSending || !workspaceEmailId}
-          >
-            {isSending ? "Sending..." : "Send email"}
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
