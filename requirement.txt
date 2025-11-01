@@ -1,0 +1,59 @@
+Here is what i want to build - A CRM for an organization similar to Bigin Zoho crm but with limited functionality - 
+- Give a api end point to Collect leads data and storing in supabase (like some submit a form using another website.)
+- Link google workspace email account with the help of Domain-wide Delegation
+- send email to that lead using linked email with the help of gmail api
+
+NOTE- Make sure everything is for the production ready.
+
+1. Tech Stack 
+  Next.js, Supabase, Google Api for sending email and managing email.
+
+2. Supabase Auth for authentication
+   - it don't have any signup functionality
+   - it have only login functionality
+   - after login there is a otp verification with the help of a otp_request table
+   - for otp verification, otp is send using resend to the admin of the project with the OTP.
+   - admin add a new user to the users in the authentication of supabase from the CRM with assigning a role to the user.
+
+3. It have two roles - admin, team
+4. Admin add google workspace email from the CRM to supabase auth and user table(with role).
+   - It can add multiple workspace email accounts.
+5. Admin assign any email to any team member
+6. Render ui according to the roles 
+7. admin have different ui and team have different ui
+8. Add protectedRoute to protect the pages for admin and team.
+9. use zustand for state management.
+10. Build a better ui for the CRM that look a professional CRM Tool.
+
+Here is what a team can do - 
+1. It see all the leads
+2. Click any lead to open it,
+    after open any lead it see a send email button, when click on that button there is a modal open that have a functionality to choose the email template and after choosing the template, they send email to the lead using assign email.
+    - it use google api to send email.
+3. it has a dashboard that show how many email sent by him and also other team member not admin.
+
+Here is what admin can do -
+1. It see all the email sent by team member individually
+2. It add a new workspace email
+3. view all the team members
+4. Delete any team member and also workspace email
+5. Add a new team member by assigning a workspace email
+
+For the UI -
+1. Make sure it is like a sidebar in left and the content in the right
+2. The UI is look like a CRM.
+
+
+Here is what i have in the .env.local file 
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+
+RESEND_API_KEY=
+
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=
+
+# App
+NEXT_PUBLIC_APP_URL=http://localhost:3000

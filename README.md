@@ -1,36 +1,77 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# EU CRM
 
-## Getting Started
+## Lead Ingestion API
 
-First, run the development server:
+Send leads into the CRM from external systems via the `/api/leads` endpoint.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+### Request
+
+- **URL:** `POST /api/leads`
+- **Headers:**
+  - `Content-Type: application/json`
+  - `x-api-key: <LEAD_INGESTION_API_KEY>`
+- **Body:**
+
+```json
+{
+  "name": "Jane Doe",
+  "email": "jane@example.com",
+  "company": "Example Inc",
+  "phone": "+1-555-0100",
+  "notes": "Met at the conference.",
+  "status": "new",
+  "source": {
+    "channel": "webform",
+    "campaign": "fall-2025"
+  }
+}
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`status` accepts: `new`, `contacted`, `qualified`, `proposal`, `negotiation`, `won`, `lost`.
+All fields except `name` are optional.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Responses
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `201 Created` when a new lead is stored.
+- `200 OK` when an existing lead (matched by email) is updated.
+- `400 Bad Request` if validation fails.
+- `401 Unauthorized` if the API key is missing or invalid.
 
-## Learn More
+Every successful ingest operation logs a corresponding `lead_events` entry (`created` or `updated`) capturing the payload metadata.
 
-To learn more about Next.js, take a look at the following resources:
+## Send Email API (Authenticated)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **URL:** `POST /api/send-email`
+- **Auth:** Uses the current Supabase session cookie (password + OTP flow). Only admins or team members with an assigned workspace mailbox can send.
+- **Headers:** `Content-Type: application/json`
+- **Body:**
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```json
+{
+  "leadId": "2b15293c-7a4d-4b93-b8e7-2bd1532a1f55",
+  "subject": "Proposal follow-up",
+  "textBody": "Hi Jane,\n\nGreat speaking with you today...\n",
+  "htmlBody": "<p>Hi Jane,</p><p>Great speaking with you today...</p>",
+  "cc": ["manager@example.com"],
+  "bcc": [],
+  "replyTo": "me@example.com"
+}
+```
 
-## Deploy on Vercel
+At least one of `textBody` or `htmlBody` is required. If the caller is an admin, they may optionally include `workspaceEmailId` to choose a specific connected mailbox. Team members are limited to the workspace mailbox assigned in their profile.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Responses
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `200 OK` on success with the Gmail `messageId` and `threadId`.
+- `400 Bad Request` if validation fails or the lead lacks an email.
+- `401 Unauthorized` when the caller is not signed in.
+- `403 Forbidden` if attempting to send from an unassigned mailbox.
+- `404 Not Found` when the lead ID is unknown.
+
+Every successful send posts an `email_sent` entry in `lead_events`, linking the Gmail metadata with the lead history.
+
+## Web App Overview
+- Role-aware sidebar and topbar automatically adapt between admin and team experiences.
+- Admins get dashboards, workspace mailbox management with OAuth linking, team assignment tooling, and an email activity log with filtering.
+- Team members see their personal dashboard, lead list, and lead detail timeline with an email composer that supports templates, previews, and direct sends via `/api/send-email`.
+- All sensitive actions use Supabase session checks, server actions, and the shared Zustand stores for auth role, active lead selection, and UI modals.
