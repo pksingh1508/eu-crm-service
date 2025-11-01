@@ -80,8 +80,12 @@ const NAVIGATION: Record<Exclude<UserRole, null>, NavItem[]> = {
 
 const SidebarNavItem = ({ item }: { item: NavItem }) => {
   const pathname = usePathname()
-  const isActive =
-    pathname === item.href || (pathname?.startsWith(item.href) ?? false)
+  const isExactMatch = pathname === item.href
+  const segments = item.href.split("/").filter(Boolean)
+  const allowNestedMatch = segments.length > 1
+  const isNestedRoute =
+    allowNestedMatch && !isExactMatch && pathname?.startsWith(`${item.href}/`)
+  const isActive = isExactMatch || Boolean(isNestedRoute)
 
   const Icon = item.icon
 
@@ -118,7 +122,7 @@ const SidebarNavItem = ({ item }: { item: NavItem }) => {
   )
 }
 
-const Sidebar = () => {
+const Sidebar = ({ className }: { className?: string }) => {
   const role = useAuthStore((state) => state.role)
   const isInitialized = useAuthStore((state) => state.isInitialized)
   const clearAuth = useAuthStore((state) => state.clear)
@@ -140,7 +144,12 @@ const Sidebar = () => {
   }
 
   return (
-    <aside className="hidden w-72 shrink-0 border-r border-slate-200 bg-white/80 backdrop-blur md:flex md:flex-col">
+    <aside
+      className={cn(
+        "hidden w-72 shrink-0 border-r border-slate-200 bg-white/80 backdrop-blur md:flex md:flex-col",
+        className
+      )}
+    >
       <div className="flex h-20 items-center gap-2 border-b border-slate-200 px-6">
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-base font-semibold text-white">
           EU

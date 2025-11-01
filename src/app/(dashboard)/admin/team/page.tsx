@@ -1,4 +1,4 @@
-import TeamInviteCard from "./ui/team-invite-card"
+import AddNewTeamMember from "./ui/add-new-team-member"
 import TeamMembersTable from "./ui/team-members-table"
 import { getSupabaseAdminClient } from "@/lib/supabase/admin"
 
@@ -55,7 +55,7 @@ const TeamManagementPage = async () => {
         </p>
       </div>
 
-      <TeamInviteCard />
+      <AddNewTeamMember />
 
       <TeamMembersTable
         members={members}
