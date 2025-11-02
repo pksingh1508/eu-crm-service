@@ -141,34 +141,34 @@ export const POST = async (request: Request) => {
     return serverErrorResponse();
   }
 
-  const eventType = existingLeadId ? "updated" : "created";
-  const eventPayload = {
-    ingestedAt: new Date().toISOString(),
-    source: payload.source ?? null,
-    origin: "api.leads",
-    request: {
-      name: payload.name,
-      email: payload.email ?? null,
-      company: payload.company ?? null,
-      phone: payload.phone ?? null,
-      notes: payload.notes ?? null,
-      status: payload.status ?? null,
-      assignedTo: payload.assignedTo ?? null
-    }
-  };
+  // const eventPayload = {
+  //   ingestedAt: new Date().toISOString(),
+  //   source: payload.source ?? null,
+  //   origin: "api.leads",
+  //   request: {
+  //     name: payload.name,
+  //     email: payload.email ?? null,
+  //     company: payload.company ?? null,
+  //     phone: payload.phone ?? null,
+  //     notes: payload.notes ?? null,
+  //     status: payload.status ?? null,
+  //     assignedTo: payload.assignedTo ?? null
+  //   }
+  // };
 
-  const { error: eventError } = await supabase.from("lead_events").insert({
-    lead_id: upsertedLead.id,
-    actor_id: null,
-    workspace_email_id: null,
-    event_type: eventType,
-    payload: eventPayload
-  });
+  // const { error: eventError } = await supabase.from("lead_events").insert({
+  //   lead_id: upsertedLead.id,
+  //   actor_id: null,
+  //   workspace_email_id: null,
+  //   event_type: eventType,
+  //   payload: eventPayload
+  // });
 
-  if (eventError) {
-    console.error("[lead-ingestion] event insert failed", eventError);
-  }
+  // if (eventError) {
+  //   console.error("[lead-ingestion] event insert failed", eventError);
+  // }
 
+  const eventType = "created";
   const responseBody = {
     lead: upsertedLead,
     status: eventType

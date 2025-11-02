@@ -8,10 +8,6 @@ type EmailEventRow = {
   id: string
   actor_id: string | null
   created_at: string
-  profiles?: {
-    full_name: string | null
-    email: string | null
-  } | null
 }
 
 type LeadRow = {
@@ -20,6 +16,12 @@ type LeadRow = {
   email: string | null
   status: string
   created_at: string
+}
+
+type TeamMember = {
+  id: string
+  full_name: string | null
+  email: string | null
 }
 
 const getMetrics = async () => {
@@ -31,8 +33,10 @@ const getMetrics = async () => {
   const [
     totalLeadsQuery,
     leadsThisWeekQuery,
+    totalEmailEventsQuery,
     emailEventsQuery,
-    latestLeadsQuery
+    latestLeadsQuery,
+    teamMembersQuery
   ] = await Promise.all([
     supabaseAdmin
       .from("leads")
@@ -43,45 +47,62 @@ const getMetrics = async () => {
       .gte("created_at", sevenDaysAgo.toISOString()),
     supabaseAdmin
       .from("lead_events")
-      .select(
-        "id, actor_id, created_at, profiles:actor_id(full_name,email)"
-      )
+      .select("id", { head: true, count: "exact" })
+      .eq("event_type", "email_sent"),
+    supabaseAdmin
+      .from("lead_events")
+      .select("id, actor_id, created_at")
       .eq("event_type", "email_sent")
       .gte("created_at", sevenDaysAgo.toISOString()),
     supabaseAdmin
       .from("leads")
       .select("id, name, email, status, created_at")
       .order("created_at", { ascending: false })
-      .limit(8)
+      .limit(8),
+    supabaseAdmin
+      .from("profiles")
+      .select("id, full_name, email", { count: "exact" })
+      .eq("role", "team")
+      .order("full_name", { ascending: true })
   ])
 
   const totalLeads = totalLeadsQuery.count ?? 0
   const leadsThisWeek = leadsThisWeekQuery.count ?? 0
-  const emailsThisWeek = (emailEventsQuery.data ?? []) as unknown as EmailEventRow[]
-  const latestLeads = (latestLeadsQuery.data ?? []) as unknown as LeadRow[]
+  const totalEmailEvents = totalEmailEventsQuery.count ?? 0
+  const emailsThisWeek = (emailEventsQuery.data ?? []) as EmailEventRow[]
+  const latestLeads = (latestLeadsQuery.data ?? []) as LeadRow[]
+  const teamMembers = (teamMembersQuery.data ?? []) as TeamMember[]
+  const teamMembersCount = teamMembersQuery.count ?? teamMembers.length
+
+  const teamMemberLookup = new Map(
+    teamMembers.map((member) => [member.id, member])
+  )
 
   const emailsByMember = emailsThisWeek.reduce<
     Record<
       string,
       {
         count: number
-        profile: {
-          email: string | null
-          full_name: string | null
-        }
+        name: string
+        email: string
       }
     >
   >((acc, event) => {
     const key = event.actor_id ?? "unassigned"
+    const member = event.actor_id ? teamMemberLookup.get(event.actor_id) : null
+
     if (!acc[key]) {
       acc[key] = {
         count: 0,
-        profile: {
-          email: event.profiles?.email ?? null,
-          full_name: event.profiles?.full_name ?? null
-        }
+        name:
+          member?.full_name ??
+          member?.email ??
+          (key === "unassigned" ? "Unassigned" : "Unknown"),
+        email:
+          member?.email ?? (key === "unassigned" ? "N/A" : "Unknown")
       }
     }
+
     acc[key].count += 1
     return acc
   }, {})
@@ -90,58 +111,71 @@ const getMetrics = async () => {
     .map(([actorId, entry]) => ({
       actorId,
       count: entry.count,
-      name: entry.profile.full_name ?? entry.profile.email ?? "Unknown",
-      email: entry.profile.email ?? "N/A"
+      name: entry.name,
+      email: entry.email
     }))
     .sort((a, b) => b.count - a.count)
 
   return {
     totalLeads,
     leadsThisWeek,
+    totalEmailEvents,
     emailsThisWeek: emailsThisWeek.length,
     emailsPerMember,
-    latestLeads
+    latestLeads,
+    teamMembersCount
   }
 }
 
 const AdminDashboardPage = async () => {
   const metrics = await getMetrics()
 
-  const statCards = [
-    {
-      title: "Total Leads",
-      value: metrics.totalLeads.toLocaleString(),
-      subtitle: "All-time captured leads",
-      icon: <Inbox className="h-5 w-5" />,
-      trend: {
-        direction: "up" as const,
-        value: `${metrics.leadsThisWeek} this week`
-      }
-    },
-    {
-      title: "Emails Sent (7d)",
-      value: metrics.emailsThisWeek.toLocaleString(),
-      subtitle: "Outbound emails logged",
-      icon: <Mail className="h-5 w-5" />,
-      trend: {
-        direction: metrics.emailsThisWeek > 0 ? ("up" as const) : ("neutral" as const),
-        value:
-          metrics.emailsThisWeek > 0
-            ? `${metrics.emailsThisWeek} this week`
-            : "No email activity"
-      }
-    },
-    {
-      title: "Active Senders",
-      value: metrics.emailsPerMember.length.toString(),
-      subtitle: "Team members who sent email",
-      icon: <Users2 className="h-5 w-5" />,
-      trend: {
-        direction: "neutral" as const,
-        value: "Last 7 days"
-      }
+const statCards = [
+  {
+    title: "Total Leads",
+    value: metrics.totalLeads.toLocaleString(),
+    subtitle: "All-time captured leads",
+    icon: <Inbox className="h-5 w-5" />,
+    trend: {
+      direction:
+        metrics.leadsThisWeek > 0 ? ("up" as const) : ("neutral" as const),
+      value:
+        metrics.leadsThisWeek > 0
+          ? `${metrics.leadsThisWeek} added last 7 days`
+          : "No new leads last 7 days"
     }
-  ]
+  },
+  {
+    title: "Emails Sent",
+    value: metrics.totalEmailEvents.toLocaleString(),
+    subtitle: "All-time outbound emails",
+    icon: <Mail className="h-5 w-5" />,
+    trend: {
+      direction:
+        metrics.emailsThisWeek > 0 ? ("up" as const) : ("neutral" as const),
+      value:
+        metrics.emailsThisWeek > 0
+          ? `${metrics.emailsThisWeek} in last 7 days`
+          : "No emails last 7 days"
+    }
+  },
+  {
+    title: "Active Senders",
+    value: metrics.teamMembersCount.toLocaleString(),
+    subtitle: "Team members with sender access",
+    icon: <Users2 className="h-5 w-5" />,
+    trend: {
+      direction:
+        metrics.emailsPerMember.length > 0
+          ? ("up" as const)
+          : ("neutral" as const),
+      value:
+        metrics.emailsPerMember.length > 0
+          ? `${metrics.emailsPerMember.length} sent last 7 days`
+          : "No recent senders"
+    }
+  }
+]
 
   return (
     <div className="space-y-8">
@@ -232,3 +266,4 @@ const AdminDashboardPage = async () => {
 }
 
 export default AdminDashboardPage
+

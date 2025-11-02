@@ -20,6 +20,7 @@ type AdminLeadRow = {
   email: string | null;
   company: string | null;
   status: string;
+  send_by: string | null;
   created_at: string;
   profiles: {
     full_name: string | null;
@@ -27,7 +28,7 @@ type AdminLeadRow = {
   } | null;
 };
 
-const leadStatuses = ["new", "email sent"] as const;
+const leadStatuses = ["new", "email-send"] as const;
 
 type SearchParams = {
   query?: string;
@@ -42,7 +43,7 @@ const fetchLeads = async (params: SearchParams): Promise<AdminLeadRow[]> => {
   let leadsQuery = supabaseAdmin
     .from("leads")
     .select(
-      "id, name, email, company, status, assigned_to, created_at, profiles:assigned_to(full_name,email)"
+      "id, name, email, company, status, send_by, assigned_to, created_at, profiles:assigned_to(full_name,email)"
     )
     .order("created_at", { ascending: false })
     .limit(100);
@@ -158,25 +159,14 @@ const AdminLeadsPage = async ({
             )
           },
           {
-            key: "profiles",
-            header: "Assigned to",
-            render: (row) =>
-              row.profiles?.full_name ?? row.profiles?.email ?? "Unassigned"
+            key: "send_by",
+            header: "Sent By",
+            render: (row) => row.send_by ?? "—"
           },
           {
             key: "created_at",
             header: "Created",
             render: (row) => new Date(row.created_at).toLocaleDateString()
-          },
-          {
-            key: "actions",
-            header: "",
-            className: "text-right",
-            render: (row) => (
-              <Button asChild size="sm" variant="outline">
-                <Link href={`/team/leads/${row.id}`}>View</Link>
-              </Button>
-            )
           }
         ]}
         data={leads}

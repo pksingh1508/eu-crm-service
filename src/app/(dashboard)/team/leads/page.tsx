@@ -39,6 +39,7 @@ type TeamLeadRow = {
   email: string | null;
   company: string | null;
   status: string;
+  send_by: string | null;
   updated_at: string;
 };
 
@@ -55,7 +56,7 @@ const fetchTeamLeads = async (
 
   let leadsQuery = supabaseAdmin
     .from("leads")
-    .select("id, name, email, company, status, updated_at", {
+    .select("id, name, email, company, status, send_by, updated_at", {
       count: "exact"
     })
     .order("updated_at", { ascending: false })
@@ -211,11 +212,6 @@ const TeamLeadsPage = async ({
             )
           },
           {
-            key: "company",
-            header: "Company",
-            render: (row) => row.company ?? "—"
-          },
-          {
             key: "status",
             header: "Status",
             render: (row) => (
@@ -223,6 +219,11 @@ const TeamLeadsPage = async ({
                 {row.status}
               </span>
             )
+          },
+          {
+            key: "send_by",
+            header: "Sent By",
+            render: (row) => row.send_by ?? "—"
           },
           {
             key: "updated_at",

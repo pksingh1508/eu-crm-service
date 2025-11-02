@@ -88,38 +88,73 @@ const EmailActivityPage = async ({
   const member = resolvedSearchParams.member ?? "all";
   const rangeStart = getRangeStart(range);
 
-  const [membersQuery, eventsQuery] = await Promise.all([
-    supabaseAdmin
-      .from("profiles")
-      .select("id, full_name, email")
-      .eq("role", "team")
-      .order("full_name", { ascending: true }),
-    (() => {
-      let query = supabaseAdmin
-        .from("lead_events")
-        .select(
-          "id, created_at, payload, lead:lead_id(name,email), profiles:actor_id(full_name,email)"
-        )
-        .eq("event_type", "email_sent")
-        .order("created_at", { ascending: false })
-        .limit(100);
+  const { data: membersData, error: membersError } = await supabaseAdmin
+    .from("profiles")
+    .select("id, full_name, email")
+    .eq("role", "team")
+    .order("full_name", { ascending: true });
 
-      if (member !== "all") {
-        query = query.eq("actor_id", member);
-      }
+  if (membersError) {
+    console.error(
+      "[admin-email-activity] failed to load team members",
+      membersError
+    );
+  }
 
-      if (rangeStart) {
-        query = query.gte("created_at", rangeStart.toISOString());
-      }
+  let eventsBuilder = supabaseAdmin
+    .from("lead_events")
+    .select("id, created_at, payload, actor_id, lead:lead_id(name,email)")
+    .eq("event_type", "email_sent")
+    .order("created_at", { ascending: false })
+    .limit(100);
 
-      return query;
-    })()
-  ]);
+  if (member !== "all") {
+    eventsBuilder = eventsBuilder.eq("actor_id", member);
+  }
 
-  const teamMembers = (membersQuery.data ??
-    []) as unknown as TeamMemberOption[];
-  const events = (eventsQuery.data ?? []) as unknown as EmailActivityRow[];
+  if (rangeStart) {
+    eventsBuilder = eventsBuilder.gte("created_at", rangeStart.toISOString());
+  }
 
+  const { data: eventsData, error: eventsError } = await eventsBuilder;
+
+  if (eventsError) {
+    console.error(
+      "[admin-email-activity] failed to load email events",
+      eventsError
+    );
+  }
+
+  const teamMembers = (membersData ?? []) as unknown as TeamMemberOption[];
+  const teamMemberById = new Map(
+    teamMembers.map((member) => [member.id, member])
+  );
+
+  type RawEvent = {
+    id: string;
+    created_at: string;
+    payload: EmailActivityRow["payload"];
+    lead: EmailActivityRow["lead"];
+    actor_id: string | null;
+  };
+
+  const events = (eventsData ?? []).map((raw) => {
+    const event = raw as unknown as RawEvent;
+    const member = event.actor_id ? teamMemberById.get(event.actor_id) : null;
+
+    return {
+      id: event.id,
+      created_at: event.created_at,
+      payload: event.payload,
+      lead: event.lead,
+      profiles: member
+        ? {
+            full_name: member.full_name,
+            email: member.email
+          }
+        : null
+    } as EmailActivityRow;
+  });
   return (
     <div className="space-y-6">
       <div>

@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useTransition } from "react"
+import { toast } from "sonner"
 import {
   BarChart3,
   Inbox,
@@ -15,6 +16,7 @@ import { cn } from "@/lib/utils"
 import { useAuthStore, type UserRole } from "@/stores/auth-store"
 import { logoutAction } from "@/server/auth/actions"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 
 type NavItem = {
   href: string
@@ -136,6 +138,7 @@ const Sidebar = ({ className }: { className?: string }) => {
       try {
         await logoutAction()
         clearAuth()
+        toast.success("Logout successfully")
         router.push("/login")
       } catch (error) {
         console.error("[sidebar] logout failed", error)
@@ -187,7 +190,14 @@ const Sidebar = ({ className }: { className?: string }) => {
           onClick={handleLogout}
           disabled={isLoggingOut}
         >
-          {isLoggingOut ? "Signing out..." : "Log out"}
+          {isLoggingOut ? (
+            <>
+              <Spinner className="text-slate-600" />
+              Signing out
+            </>
+          ) : (
+            "Log out"
+          )}
         </Button>
         <p className="mt-4 text-xs text-slate-400">
           &copy; {new Date().getFullYear()} EU Careers Serwis
