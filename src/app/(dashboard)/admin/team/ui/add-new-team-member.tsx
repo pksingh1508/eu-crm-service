@@ -1,38 +1,56 @@
-"use client"
+"use client";
 
-import { useEffect, useRef } from "react"
-import { useActionState } from "react"
+import { useEffect, useRef } from "react";
+import { useActionState } from "react";
+import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Spinner } from "@/components/ui/spinner";
 import {
   createTeamMemberAction,
   type CreateTeamMemberState
-} from "@/server/team/actions"
+} from "@/server/team/actions";
+import { useRouter } from "next/navigation";
 
 const initialState: CreateTeamMemberState = {
   success: false,
   error: undefined
-}
+};
 
 const AddNewTeamMember = () => {
-  const formRef = useRef<HTMLFormElement | null>(null)
-  const [state, formAction] = useActionState(createTeamMemberAction, initialState)
+  const formRef = useRef<HTMLFormElement | null>(null);
+  const [state, formAction, isPending] = useActionState(
+    createTeamMemberAction,
+    initialState
+  );
+  const router = useRouter();
 
   useEffect(() => {
     if (state.success) {
-      formRef.current?.reset()
+      formRef.current?.reset();
+      toast.success("Team member created. Share the credentials securely.");
+      router.refresh();
     }
-  }, [state.success])
+  }, [state.success]);
 
   return (
     <Card className="border-slate-200 shadow-sm">
       <CardHeader>
-        <CardTitle className="text-xl text-slate-900">Add a team member</CardTitle>
+        <CardTitle className="text-xl text-slate-900">
+          Add a team member
+        </CardTitle>
         <CardDescription>
-          Create an account directly and share the credentials securely with your teammate.
+          Create an account directly and share the credentials securely with
+          your teammate.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -73,15 +91,21 @@ const AddNewTeamMember = () => {
           ) : null}
 
           <div className="md:col-span-2 flex justify-end">
-            <Button type="submit" className="md:w-auto">
-              Create account
+            <Button type="submit" className="md:w-auto" disabled={isPending}>
+              {isPending ? (
+                <>
+                  <Spinner className="mr-2 text-white" />
+                  creating
+                </>
+              ) : (
+                "Create account"
+              )}
             </Button>
           </div>
         </form>
       </CardContent>
     </Card>
-  )
-}
+  );
+};
 
-export default AddNewTeamMember
-
+export default AddNewTeamMember;

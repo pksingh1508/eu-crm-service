@@ -1,59 +1,57 @@
-﻿import Link from "next/link"
-import { redirect } from "next/navigation"
+﻿import Link from "next/link";
+import { redirect } from "next/navigation";
 
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import DataTable from "@/components/ui/data-table"
-import { getSupabaseServerClient } from "@/lib/supabase/server"
-import { getSupabaseAdminClient } from "@/lib/supabase/admin"
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
+import DataTable from "@/components/ui/data-table";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
-const LEAD_STATUSES = [
-  "new",
-  "contacted",
-  "qualified",
-  "proposal",
-  "negotiation",
-  "won",
-  "lost"
-] as const
+const LEAD_STATUSES = ["new", "email sent"] as const;
 
 type SearchParams = {
-  status?: string
-  query?: string
-  page?: string
-}
+  status?: string;
+  query?: string;
+  page?: string;
+};
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 20;
 
 type TeamLeadResult = {
-  leads: TeamLeadRow[]
-  page: number
-  totalPages: number | null
-  hasNext: boolean
-  hasPrevious: boolean
-}
+  leads: TeamLeadRow[];
+  page: number;
+  totalPages: number | null;
+  hasNext: boolean;
+  hasPrevious: boolean;
+};
 
 type TeamLeadRow = {
-  id: string
-  name: string
-  email: string | null
-  company: string | null
-  status: string
-  updated_at: string
-}
+  id: string;
+  name: string;
+  email: string | null;
+  company: string | null;
+  status: string;
+  updated_at: string;
+};
 
 const fetchTeamLeads = async (
   searchParams: SearchParams
 ): Promise<TeamLeadResult> => {
-  const supabaseAdmin = getSupabaseAdminClient()
-  const query = searchParams.query?.trim() ?? ""
-  const status = searchParams.status ?? "all"
-  const rawPage = Number.parseInt(searchParams.page ?? "1", 10)
-  const page = Number.isNaN(rawPage) || rawPage < 1 ? 1 : rawPage
-  const from = (page - 1) * PAGE_SIZE
-  const to = from + PAGE_SIZE - 1
+  const supabaseAdmin = getSupabaseAdminClient();
+  const query = searchParams.query?.trim() ?? "";
+  const status = searchParams.status ?? "all";
+  const rawPage = Number.parseInt(searchParams.page ?? "1", 10);
+  const page = Number.isNaN(rawPage) || rawPage < 1 ? 1 : rawPage;
+  const from = (page - 1) * PAGE_SIZE;
+  const to = from + PAGE_SIZE - 1;
 
   let leadsQuery = supabaseAdmin
     .from("leads")
@@ -61,39 +59,39 @@ const fetchTeamLeads = async (
       count: "exact"
     })
     .order("updated_at", { ascending: false })
-    .range(from, to)
+    .range(from, to);
 
   if (query.length > 0) {
-    const like = `%${query}%`
+    const like = `%${query}%`;
     leadsQuery = leadsQuery.or(
       `name.ilike.${like},email.ilike.${like},company.ilike.${like}`
-    )
+    );
   }
 
   if (status !== "all") {
-    leadsQuery = leadsQuery.eq("status", status)
+    leadsQuery = leadsQuery.eq("status", status);
   }
 
-  const { data, error, count } = await leadsQuery
+  const { data, error, count } = await leadsQuery;
 
   if (error) {
-    console.error("[team-leads] failed to load leads", error)
+    console.error("[team-leads] failed to load leads", error);
     return {
       leads: [],
       page,
-      totalPages: count != null
-        ? Math.max(1, Math.ceil(count / PAGE_SIZE))
-        : null,
+      totalPages:
+        count != null ? Math.max(1, Math.ceil(count / PAGE_SIZE)) : null,
       hasNext: false,
       hasPrevious: page > 1
-    }
+    };
   }
 
-  const leads = (data ?? []) as unknown as TeamLeadRow[]
+  const leads = (data ?? []) as unknown as TeamLeadRow[];
   const totalPages =
-    count != null ? Math.max(1, Math.ceil(count / PAGE_SIZE)) : null
-  const hasNext = totalPages != null ? page < totalPages : leads.length === PAGE_SIZE
-  const hasPrevious = page > 1
+    count != null ? Math.max(1, Math.ceil(count / PAGE_SIZE)) : null;
+  const hasNext =
+    totalPages != null ? page < totalPages : leads.length === PAGE_SIZE;
+  const hasPrevious = page > 1;
 
   return {
     leads,
@@ -101,27 +99,27 @@ const fetchTeamLeads = async (
     totalPages,
     hasNext,
     hasPrevious
-  }
-}
+  };
+};
 
 const TeamLeadsPage = async ({
   searchParams
 }: {
-  searchParams: Promise<SearchParams>
+  searchParams: Promise<SearchParams>;
 }) => {
-  const resolvedSearchParams = await searchParams
-  const supabase = await getSupabaseServerClient()
+  const resolvedSearchParams = await searchParams;
+  const supabase = await getSupabaseServerClient();
   const {
     data: { user },
     error: userError
-  } = await supabase.auth.getUser()
+  } = await supabase.auth.getUser();
 
   if (userError) {
-    console.error("[team-leads] failed to verify auth user", userError)
+    console.error("[team-leads] failed to verify auth user", userError);
   }
 
   if (!user) {
-    redirect("/login")
+    redirect("/login");
   }
 
   const {
@@ -130,29 +128,27 @@ const TeamLeadsPage = async ({
     totalPages,
     hasNext,
     hasPrevious
-  } = await fetchTeamLeads(resolvedSearchParams)
+  } = await fetchTeamLeads(resolvedSearchParams);
 
   const buildPageLink = (page: number) => {
-    const params = new URLSearchParams()
+    const params = new URLSearchParams();
     if (resolvedSearchParams.query) {
-      params.set("query", resolvedSearchParams.query)
+      params.set("query", resolvedSearchParams.query);
     }
     if (resolvedSearchParams.status) {
-      params.set("status", resolvedSearchParams.status)
+      params.set("status", resolvedSearchParams.status);
     }
     if (page > 1) {
-      params.set("page", page.toString())
+      params.set("page", page.toString());
     }
-    const queryString = params.toString()
-    return queryString ? `/team/leads?${queryString}` : "/team/leads"
-  }
+    const queryString = params.toString();
+    return queryString ? `/team/leads?${queryString}` : "/team/leads";
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-semibold text-slate-900">
-          My leads
-        </h1>
+        <h1 className="text-3xl font-semibold text-slate-900">My leads</h1>
         <p className="text-sm text-slate-600">
           Filter and manage the leads assigned to you.
         </p>
@@ -173,10 +169,13 @@ const TeamLeadsPage = async ({
         </div>
         <div className="grid gap-2">
           <Label htmlFor="status">Status</Label>
-            <Select name="status" defaultValue={resolvedSearchParams.status ?? "all"}>
-              <SelectTrigger id="status">
-                <SelectValue placeholder="All statuses" />
-              </SelectTrigger>
+          <Select
+            name="status"
+            defaultValue={resolvedSearchParams.status ?? "all"}
+          >
+            <SelectTrigger id="status">
+              <SelectValue placeholder="All statuses" />
+            </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
               {LEAD_STATUSES.map((status) => (
@@ -204,9 +203,7 @@ const TeamLeadsPage = async ({
             header: "Lead",
             render: (row) => (
               <div className="flex flex-col">
-                <span className="font-semibold text-slate-900">
-                  {row.name}
-                </span>
+                <span className="font-semibold text-slate-900">{row.name}</span>
                 <span className="text-xs text-slate-500">
                   {row.email ?? "—"}
                 </span>
@@ -230,8 +227,7 @@ const TeamLeadsPage = async ({
           {
             key: "updated_at",
             header: "Updated",
-            render: (row) =>
-              new Date(row.updated_at).toLocaleDateString()
+            render: (row) => new Date(row.updated_at).toLocaleDateString()
           },
           {
             key: "actions",
@@ -276,7 +272,7 @@ const TeamLeadsPage = async ({
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default TeamLeadsPage
+export default TeamLeadsPage;

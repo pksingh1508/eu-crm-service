@@ -4,15 +4,22 @@ import { useActionState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
 import {
   deleteWorkspaceEmailAction,
   type WorkspaceEmailDeleteState
 } from "@/server/workspace-emails/actions"
+import { toast } from "sonner"
 
 const initialState: WorkspaceEmailDeleteState = {
   success: false,
   error: undefined
 }
+
+const dateFormatter = new Intl.DateTimeFormat("en-US", {
+  dateStyle: "short",
+  timeStyle: "medium"
+})
 
 type WorkspaceEmailRowProps = {
   email: string
@@ -30,13 +37,14 @@ const WorkspaceEmailRow = ({
   workspaceEmailId
 }: WorkspaceEmailRowProps) => {
   const router = useRouter()
-  const [state, formAction] = useActionState(
+  const [state, formAction, isPending] = useActionState(
     deleteWorkspaceEmailAction,
     initialState
   )
 
   useEffect(() => {
     if (state.success) {
+      toast.success("Workspace email removed successfully.")
       router.refresh()
     }
   }, [state.success, router])
@@ -59,7 +67,7 @@ const WorkspaceEmailRow = ({
         )}
       </td>
       <td className="px-6 py-4 text-slate-500">
-        {new Date(createdAt).toLocaleString()}
+        {dateFormatter.format(new Date(createdAt))}
       </td>
       <td className="px-6 py-4 text-right">
         <form action={formAction} className="inline-flex flex-col items-end gap-2">
@@ -69,8 +77,16 @@ const WorkspaceEmailRow = ({
             variant="destructive"
             size="sm"
             className="shadow-none"
+            disabled={isPending}
           >
-            Delete
+            {isPending ? (
+              <>
+                <Spinner className="mr-2 text-white" />
+                Deleting
+              </>
+            ) : (
+              "Delete"
+            )}
           </Button>
           {state.error ? (
             <span className="text-xs text-rose-600">{state.error}</span>

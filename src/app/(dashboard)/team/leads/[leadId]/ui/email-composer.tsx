@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 
 import {
   Dialog,
@@ -14,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { Spinner } from "@/components/ui/spinner"
 import {
   Select,
   SelectContent,
@@ -144,6 +146,7 @@ const EmailComposer = ({
       }
 
       setFeedback("Email sent successfully.")
+      toast.success("Email sent successfully.")
       router.refresh()
       setTimeout(() => {
         closeEmailComposer()
@@ -282,7 +285,14 @@ const EmailComposer = ({
               onClick={handleSend}
               disabled={isSending || !workspaceEmailId}
             >
-              {isSending ? "Sending..." : "Send email"}
+              {isSending ? (
+                <>
+                  <Spinner className="mr-2 text-white" />
+                  sending...
+                </>
+              ) : (
+                "Send email"
+              )}
             </Button>
           </DialogFooter>
         </div>

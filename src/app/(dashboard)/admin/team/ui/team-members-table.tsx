@@ -11,6 +11,8 @@ import {
   type TeamAssignmentState
 } from "@/server/team/actions"
 import { Button } from "@/components/ui/button"
+import { Spinner } from "@/components/ui/spinner"
+import { toast } from "sonner"
 
 type TeamMemberRecord = {
   id: string
@@ -111,20 +113,28 @@ const TeamMemberRow = ({
 }) => {
   const router = useRouter()
 
-  const [assignmentState, assignmentAction] = useActionState(
+  const [assignmentState, assignmentAction, isAssignmentPending] = useActionState(
     updateTeamAssignmentAction,
     assignmentInitialState
   )
-  const [removeState, removeAction] = useActionState(
+  const [removeState, removeAction, isRemovePending] = useActionState(
     removeTeamMemberAction,
     removeInitialState
   )
 
   useEffect(() => {
-    if (assignmentState.success || removeState.success) {
+    if (assignmentState.success) {
+      toast.success("Team member updated")
       router.refresh()
     }
-  }, [assignmentState.success, removeState.success, router])
+  }, [assignmentState.success, router])
+
+  useEffect(() => {
+    if (removeState.success) {
+      toast.success("Team member removed")
+      router.refresh()
+    }
+  }, [removeState.success, router])
 
   const currentWorkspaceEmail =
     member.workspace_emails?.display_name ??
@@ -170,8 +180,21 @@ const TeamMemberRow = ({
               </option>
             ))}
           </select>
-          <Button type="submit" size="sm" variant="outline" className="md:w-auto">
-            Update
+          <Button
+            type="submit"
+            size="sm"
+            variant="outline"
+            className="md:w-auto"
+            disabled={isAssignmentPending}
+          >
+            {isAssignmentPending ? (
+              <>
+                <Spinner className="mr-2" />
+                Updating
+              </>
+            ) : (
+              "Update"
+            )}
           </Button>
         </form>
         {assignmentState.error ? (
@@ -194,8 +217,16 @@ const TeamMemberRow = ({
             variant="destructive"
             size="sm"
             className="md:w-auto"
+            disabled={isRemovePending}
           >
-            Remove
+            {isRemovePending ? (
+              <>
+                <Spinner className="mr-2 text-white" />
+                Removing
+              </>
+            ) : (
+              "Remove"
+            )}
           </Button>
           {removeState.error ? (
             <span className="text-xs text-rose-600">{removeState.error}</span>

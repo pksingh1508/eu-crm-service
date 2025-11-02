@@ -194,6 +194,15 @@ export const POST = async (request: Request) => {
     if (eventError) {
       console.error("[send-email] lead event insert failed", eventError);
     }
+    // update the lead's status as email-sent
+    const { error: leadUpdateError } = await supabaseAdmin
+      .from("leads")
+      .update({ status: "email-send" })
+      .eq("id", lead.id);
+
+    if (leadUpdateError) {
+      console.error("[send-email] lead status update failed", leadUpdateError);
+    }
 
     return NextResponse.json(
       {

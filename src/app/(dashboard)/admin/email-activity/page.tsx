@@ -1,80 +1,92 @@
+﻿export const revalidate = 0;
 
-import { Button } from "@/components/ui/button"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import DataTable from "@/components/ui/data-table"
-import { getSupabaseAdminClient } from "@/lib/supabase/admin"
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue
+} from "@/components/ui/select";
+import DataTable from "@/components/ui/data-table";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type TeamMemberOption = {
-  id: string
-  full_name: string | null
-  email: string | null
-}
+  id: string;
+  full_name: string | null;
+  email: string | null;
+};
 
 type EmailActivityRow = {
-  id: string
-  created_at: string
+  id: string;
+  created_at: string;
   payload: {
-    subject?: string | null
-    textBody?: string | null
-    [key: string]: any
-  } | null
+    subject?: string | null;
+    textBody?: string | null;
+    [key: string]: any;
+  } | null;
   lead: {
-    name: string | null
-    email: string | null
-  } | null
+    name: string | null;
+    email: string | null;
+  } | null;
   profiles: {
-    full_name: string | null
-    email: string | null
-  } | null
-}
+    full_name: string | null;
+    email: string | null;
+  } | null;
+};
 
 const DATE_RANGES = [
   { value: "7d", label: "Last 7 days" },
   { value: "30d", label: "Last 30 days" },
   { value: "90d", label: "Last 90 days" },
   { value: "all", label: "All time" }
-] as const
+] as const;
 
 type SearchParams = {
-  member?: string
-  range?: (typeof DATE_RANGES)[number]["value"]
-}
+  member?: string;
+  range?: (typeof DATE_RANGES)[number]["value"];
+};
+
+const createdAtFormatter = new Intl.DateTimeFormat("en-US", {
+  dateStyle: "short",
+  timeStyle: "medium"
+});
 
 const getRangeStart = (range: SearchParams["range"]) => {
-  const now = new Date()
+  const now = new Date();
   switch (range) {
     case "7d": {
-      const date = new Date(now)
-      date.setDate(now.getDate() - 7)
-      return date
+      const date = new Date(now);
+      date.setDate(now.getDate() - 7);
+      return date;
     }
     case "30d": {
-      const date = new Date(now)
-      date.setDate(now.getDate() - 30)
-      return date
+      const date = new Date(now);
+      date.setDate(now.getDate() - 30);
+      return date;
     }
     case "90d": {
-      const date = new Date(now)
-      date.setDate(now.getDate() - 90)
-      return date
+      const date = new Date(now);
+      date.setDate(now.getDate() - 90);
+      return date;
     }
     default:
-      return null
+      return null;
   }
-}
+};
 
 const EmailActivityPage = async ({
   searchParams
 }: {
-  searchParams: Promise<SearchParams>
+  searchParams: Promise<SearchParams>;
 }) => {
-  const resolvedSearchParams = await searchParams
-  const supabaseAdmin = getSupabaseAdminClient()
+  const resolvedSearchParams = await searchParams;
+  const supabaseAdmin = getSupabaseAdminClient();
 
-  const range = resolvedSearchParams.range ?? "30d"
-  const member = resolvedSearchParams.member ?? "all"
-  const rangeStart = getRangeStart(range)
+  const range = resolvedSearchParams.range ?? "all";
+  const member = resolvedSearchParams.member ?? "all";
+  const rangeStart = getRangeStart(range);
 
   const [membersQuery, eventsQuery] = await Promise.all([
     supabaseAdmin
@@ -90,22 +102,23 @@ const EmailActivityPage = async ({
         )
         .eq("event_type", "email_sent")
         .order("created_at", { ascending: false })
-        .limit(100)
+        .limit(100);
 
       if (member !== "all") {
-        query = query.eq("actor_id", member)
+        query = query.eq("actor_id", member);
       }
 
       if (rangeStart) {
-        query = query.gte("created_at", rangeStart.toISOString())
+        query = query.gte("created_at", rangeStart.toISOString());
       }
 
-      return query
+      return query;
     })()
-  ])
+  ]);
 
-  const teamMembers = (membersQuery.data ?? []) as unknown as TeamMemberOption[]
-  const events = (eventsQuery.data ?? []) as unknown as EmailActivityRow[]
+  const teamMembers = (membersQuery.data ??
+    []) as unknown as TeamMemberOption[];
+  const events = (eventsQuery.data ?? []) as unknown as EmailActivityRow[];
 
   return (
     <div className="space-y-6">
@@ -114,7 +127,8 @@ const EmailActivityPage = async ({
           Email activity log
         </h1>
         <p className="mt-2 text-sm text-slate-600">
-          Review outbound email history, filter by team member, and audit lead interactions.
+          Review outbound email history, filter by team member, and audit lead
+          interactions.
         </p>
       </div>
 
@@ -168,8 +182,7 @@ const EmailActivityPage = async ({
           {
             key: "created_at",
             header: "Sent at",
-            render: (row) =>
-              new Date(row.created_at).toLocaleString()
+            render: (row) => createdAtFormatter.format(new Date(row.created_at))
           },
           {
             key: "lead",
@@ -180,7 +193,7 @@ const EmailActivityPage = async ({
                   {row.lead?.name ?? "Unknown"}
                 </span>
                 <span className="text-xs text-slate-500">
-                  {row.lead?.email ?? "—"}
+                  {row.lead?.email ?? "-"}
                 </span>
               </div>
             )
@@ -194,7 +207,7 @@ const EmailActivityPage = async ({
                   {row.profiles?.full_name ?? row.profiles?.email ?? "Unknown"}
                 </span>
                 <span className="text-xs text-slate-500">
-                  {row.profiles?.email ?? "—"}
+                  {row.profiles?.email ?? "-"}
                 </span>
               </div>
             )
@@ -203,9 +216,7 @@ const EmailActivityPage = async ({
             key: "subject",
             header: "Subject",
             render: (row) =>
-              row.payload?.subject ??
-              row.payload?.request?.subject ??
-              "—"
+              row.payload?.subject ?? row.payload?.request?.subject ?? "-"
           },
           {
             key: "payload",
@@ -224,7 +235,7 @@ const EmailActivityPage = async ({
         rowKey={(row) => row.id}
       />
     </div>
-  )
-}
+  );
+};
 
-export default EmailActivityPage
+export default EmailActivityPage;

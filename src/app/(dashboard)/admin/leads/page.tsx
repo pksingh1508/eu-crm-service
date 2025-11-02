@@ -1,51 +1,43 @@
-﻿import Link from "next/link"
-import { redirect } from "next/navigation"
+﻿import Link from "next/link";
+import { redirect } from "next/navigation";
 
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue
-} from "@/components/ui/select"
-import DataTable from "@/components/ui/data-table"
-import { getSupabaseAdminClient } from "@/lib/supabase/admin"
+} from "@/components/ui/select";
+import DataTable from "@/components/ui/data-table";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type AdminLeadRow = {
-  id: string
-  name: string
-  email: string | null
-  company: string | null
-  status: string
-  created_at: string
+  id: string;
+  name: string;
+  email: string | null;
+  company: string | null;
+  status: string;
+  created_at: string;
   profiles: {
-    full_name: string | null
-    email: string | null
-  } | null
-}
+    full_name: string | null;
+    email: string | null;
+  } | null;
+};
 
-const leadStatuses = [
-  "new",
-  "contacted",
-  "qualified",
-  "proposal",
-  "negotiation",
-  "won",
-  "lost"
-] as const
+const leadStatuses = ["new", "email sent"] as const;
 
 type SearchParams = {
-  query?: string
-  status?: string
-}
+  query?: string;
+  status?: string;
+};
 
 const fetchLeads = async (params: SearchParams): Promise<AdminLeadRow[]> => {
-  const supabaseAdmin = getSupabaseAdminClient()
-  const query = params.query?.trim() ?? ""
-  const status = params.status ?? "all"
+  const supabaseAdmin = getSupabaseAdminClient();
+  const query = params.query?.trim() ?? "";
+  const status = params.status ?? "all";
 
   let leadsQuery = supabaseAdmin
     .from("leads")
@@ -53,36 +45,36 @@ const fetchLeads = async (params: SearchParams): Promise<AdminLeadRow[]> => {
       "id, name, email, company, status, assigned_to, created_at, profiles:assigned_to(full_name,email)"
     )
     .order("created_at", { ascending: false })
-    .limit(100)
+    .limit(100);
 
   if (query.length > 0) {
-    const like = `%${query}%`
+    const like = `%${query}%`;
     leadsQuery = leadsQuery.or(
       `name.ilike.${like},email.ilike.${like},company.ilike.${like}`
-    )
+    );
   }
 
   if (status !== "all") {
-    leadsQuery = leadsQuery.eq("status", status)
+    leadsQuery = leadsQuery.eq("status", status);
   }
 
-  const { data, error } = await leadsQuery
+  const { data, error } = await leadsQuery;
 
   if (error) {
-    console.error("[admin-leads] failed to load leads", error)
-    redirect("/admin?error=Unable to load leads")
+    console.error("[admin-leads] failed to load leads", error);
+    redirect("/admin?error=Unable to load leads");
   }
 
-  return (data ?? []) as unknown as AdminLeadRow[]
-}
+  return (data ?? []) as unknown as AdminLeadRow[];
+};
 
 const AdminLeadsPage = async ({
   searchParams
 }: {
-  searchParams: Promise<SearchParams>
+  searchParams: Promise<SearchParams>;
 }) => {
-  const resolvedParams = await searchParams
-  const leads = await fetchLeads(resolvedParams)
+  const resolvedParams = await searchParams;
+  const leads = await fetchLeads(resolvedParams);
 
   return (
     <div className="space-y-6">
@@ -93,9 +85,9 @@ const AdminLeadsPage = async ({
             View and manage every lead captured across your workspace.
           </p>
         </div>
-        <Button asChild>
+        {/* <Button asChild>
           <Link href="/team/leads">Switch to team view</Link>
-        </Button>
+        </Button> */}
       </div>
 
       <form
@@ -145,7 +137,9 @@ const AdminLeadsPage = async ({
             render: (row) => (
               <div className="flex flex-col">
                 <span className="font-semibold text-slate-900">{row.name}</span>
-                <span className="text-xs text-slate-500">{row.company ?? "—"}</span>
+                <span className="text-xs text-slate-500">
+                  {row.company ?? "—"}
+                </span>
               </div>
             )
           },
@@ -189,7 +183,7 @@ const AdminLeadsPage = async ({
         rowKey={(row) => row.id}
       />
     </div>
-  )
-}
+  );
+};
 
-export default AdminLeadsPage
+export default AdminLeadsPage;
