@@ -9,7 +9,8 @@ import {
   Inbox,
   LayoutDashboard,
   Mail,
-  Users
+  Users,
+  FileText
 } from "lucide-react"
 
 import { cn } from "@/lib/utils"
@@ -56,6 +57,12 @@ const NAVIGATION: Record<Exclude<UserRole, null>, NavItem[]> = {
       label: "Email Activity",
       icon: BarChart3,
       description: "Tracking & filters"
+    },
+    {
+      href: "/admin/email-template",
+      label: "Email Templates",
+      icon: FileText,
+      description: "Create & manage templates"
     }
   ],
   team: [

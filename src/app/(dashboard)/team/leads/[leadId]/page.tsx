@@ -108,14 +108,16 @@ const LeadDetailPage = async ({
             {lead.notes ?? "No notes yet. Add context as you progress."}
           </p>
         </div>
-        <div className="flex flex-col items-start gap-2 md:items-end">
-          <SendEmailButton leadId={lead.id} disabled={!workspaceEmailId} />
-          {!workspaceEmailId ? (
-            <p className="text-xs text-rose-600">
-              No workspace mailbox assigned. Please contact an administrator.
-            </p>
-          ) : null}
-        </div>
+        {lead.status !== "email-send" && (
+          <div className="flex flex-col items-start gap-2 md:items-end">
+            <SendEmailButton leadId={lead.id} disabled={!workspaceEmailId} />
+            {!workspaceEmailId ? (
+              <p className="text-xs text-rose-600">
+                No workspace mailbox assigned. Please contact an administrator.
+              </p>
+            ) : null}
+          </div>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
