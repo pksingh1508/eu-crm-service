@@ -21,6 +21,10 @@ type QuillEditorProps = {
   onChange: (value: string) => void;
 };
 
+type QuillToolbarModule = {
+  addHandler: (name: string, handler: (...args: unknown[]) => void) => void;
+};
+
 const toolbarOptions = [
   [{ header: [1, 2, 3, false] }],
   ["bold", "italic", "underline", "strike"],
@@ -92,7 +96,9 @@ const QuillEditor = ({ value, onChange }: QuillEditorProps) => {
       handlerRef.current = handleChange;
       quillInstance.on("text-change", handleChange);
 
-      const toolbar = quillInstance.getModule("toolbar");
+      const toolbar = quillInstance.getModule("toolbar") as
+        | QuillToolbarModule
+        | undefined;
       if (toolbar && typeof window !== "undefined") {
         toolbar.addHandler("image", () => {
           const rawUrl = window.prompt("Paste the image URL");
