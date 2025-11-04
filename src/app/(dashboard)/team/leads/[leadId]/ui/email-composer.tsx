@@ -23,9 +23,12 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
+import generateEmailHTML, {
+  generateEmailPlainText,
+  WELCOME_TEMPLATE_SUBJECT
+} from "@/emails_templates/welcome_template";
 import { useAuthStore } from "@/stores/auth-store";
 import { useUiStore } from "@/stores/ui-store";
-import type { EmailTemplate } from "@/constants/email-templates";
 
 type LeadInfo = {
   id: string;
@@ -36,25 +39,33 @@ type LeadInfo = {
 type EmailComposerProps = {
   lead: LeadInfo;
   workspaceEmailId: string | null;
-  templates: EmailTemplate[];
 };
 
-const EmailComposer = ({
-  lead,
-  workspaceEmailId,
-  templates
-}: EmailComposerProps) => {
+const TEMPLATE_OPTIONS = [
+  {
+    id: "welcome-template",
+    name: "EU Career Serwis | Welcome",
+    subject: WELCOME_TEMPLATE_SUBJECT
+  }
+] as const;
+
+const EmailComposer = ({ lead, workspaceEmailId }: EmailComposerProps) => {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const { isEmailComposerOpen, activeLeadId, closeEmailComposer } =
     useUiStore();
 
+  const fallbackCandidateName = useMemo(
+    () => lead.name?.trim() || lead.email?.trim() || "Candidate",
+    [lead.name, lead.email]
+  );
+
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
     null
   );
+  const [candidateName, setCandidateName] = useState(fallbackCandidateName);
   const [subject, setSubject] = useState("");
   const [textBody, setTextBody] = useState("");
-  const [htmlBody, setHtmlBody] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -69,39 +80,53 @@ const EmailComposer = ({
     return "Team member";
   }, [user?.email]);
 
-  const leadName = lead.name ?? lead.email ?? "there";
+  const fallbackContactPerson = senderName;
+  const [contactPerson, setContactPerson] = useState(fallbackContactPerson);
 
   useEffect(() => {
     if (!isOpen) {
       setSelectedTemplateId(null);
       setSubject("");
       setTextBody("");
-      setHtmlBody("");
       setFeedback(null);
       setError(null);
+      setCandidateName(fallbackCandidateName);
+      setContactPerson(fallbackContactPerson);
     }
-  }, [isOpen]);
+  }, [isOpen, fallbackCandidateName, fallbackContactPerson]);
+
+  const resolveCandidateName = () =>
+    candidateName.trim() || fallbackCandidateName || "Candidate";
+  const resolveContactPerson = () =>
+    contactPerson.trim() || fallbackContactPerson || "Team member";
 
   const applyTemplate = (templateId: string) => {
-    const template = templates.find((tpl) => tpl.id === templateId);
+    const template = TEMPLATE_OPTIONS.find((tpl) => tpl.id === templateId);
     if (!template) {
       return;
     }
 
-    const replacements: Record<string, string> = {
-      "{{leadName}}": leadName,
-      "{{senderName}}": senderName
-    };
+    try {
+      const templateCandidateName = resolveCandidateName();
+      const templateContactPerson = resolveContactPerson();
+      const templateProps = {
+        candidateName: templateCandidateName,
+        contactPerson: templateContactPerson
+      };
 
-    const replacePlaceholders = (content: string) =>
-      Object.entries(replacements).reduce(
-        (acc, [token, value]) => acc.replaceAll(token, value),
-        content
+      const plainText = generateEmailPlainText(templateProps);
+
+      setSubject(template.subject);
+      setTextBody(plainText);
+      setFeedback(null);
+      setError(null);
+    } catch (templateError) {
+      console.error(
+        "[email-composer] template generation error",
+        templateError
       );
-
-    setSubject(replacePlaceholders(template.subject));
-    setTextBody(replacePlaceholders(template.textBody));
-    setHtmlBody(replacePlaceholders(template.htmlBody));
+      setError("Unable to generate the email template. Please try again.");
+    }
   };
 
   const handleTemplateChange = (value: string) => {
@@ -116,10 +141,24 @@ const EmailComposer = ({
       );
       return;
     }
-    if (!subject.trim() || (!textBody.trim() && !htmlBody.trim())) {
-      setError("Please provide a subject and at least one body format.");
+
+    const trimmedSubject = subject.trim();
+    const trimmedTextBody = textBody.trim();
+
+    if (!trimmedSubject || !trimmedTextBody) {
+      setError("Please provide a subject and plain text body.");
       return;
     }
+
+    const candidateForTemplate = resolveCandidateName();
+    const contactPersonForTemplate = resolveContactPerson();
+    const templateProps = {
+      candidateName: candidateForTemplate,
+      contactPerson: contactPersonForTemplate
+    };
+
+    const htmlBody =
+      selectedTemplateId !== null ? generateEmailHTML(templateProps) : null;
 
     setIsSending(true);
     setError(null);
@@ -133,8 +172,8 @@ const EmailComposer = ({
         },
         body: JSON.stringify({
           leadId: lead.id,
-          subject,
-          textBody,
+          subject: trimmedSubject,
+          textBody: trimmedTextBody,
           htmlBody,
           workspaceEmailId,
           replyTo: user?.email
@@ -192,13 +231,49 @@ const EmailComposer = ({
                     <SelectValue placeholder="Choose a template (optional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    {templates.map((template) => (
+                    {TEMPLATE_OPTIONS.map((template) => (
                       <SelectItem key={template.id} value={template.id}>
                         {template.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <label
+                  htmlFor="candidateName"
+                  className="text-sm font-medium text-slate-700"
+                >
+                  Candidate name
+                </label>
+                <Input
+                  id="candidateName"
+                  value={candidateName}
+                  onChange={(event) => setCandidateName(event.target.value)}
+                  placeholder={fallbackCandidateName}
+                />
+                <p className="text-xs text-slate-500">
+                  Update the candidate name before applying the template.
+                </p>
+              </div>
+
+              <div className="grid gap-2">
+                <label
+                  htmlFor="contactPerson"
+                  className="text-sm font-medium text-slate-700"
+                >
+                  Contact person
+                </label>
+                <Input
+                  id="contactPerson"
+                  value={contactPerson}
+                  onChange={(event) => setContactPerson(event.target.value)}
+                  placeholder={fallbackContactPerson}
+                />
+                <p className="text-xs text-slate-500">
+                  This name appears in the signature and body of the template.
+                </p>
               </div>
 
               <div className="grid gap-2">
@@ -230,49 +305,6 @@ const EmailComposer = ({
                   rows={6}
                   placeholder="Compose your message..."
                 />
-              </div>
-
-              <div className="grid gap-2">
-                <label
-                  htmlFor="htmlBody"
-                  className="text-sm font-medium text-slate-700"
-                >
-                  HTML body (optional)
-                </label>
-                <Textarea
-                  id="htmlBody"
-                  value={htmlBody}
-                  onChange={(event) => setHtmlBody(event.target.value)}
-                  rows={6}
-                  placeholder="<p>Hello...</p>"
-                />
-              </div>
-
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Preview
-                </p>
-                <div className="mt-2 grid gap-4">
-                  <div>
-                    <p className="text-xs font-medium text-slate-500">
-                      Plain text
-                    </p>
-                    <div className="mt-1 whitespace-pre-wrap rounded-md bg-white p-3 text-sm text-slate-700 shadow-inner">
-                      {textBody.trim().length > 0
-                        ? textBody
-                        : "Start typing above or choose a template to generate content."}
-                    </div>
-                  </div>
-                  {htmlBody.trim().length > 0 ? (
-                    <div>
-                      <p className="text-xs font-medium text-slate-500">HTML</p>
-                      <div
-                        className="mt-1 rounded-md bg-white p-3 text-sm text-slate-700 shadow-inner"
-                        dangerouslySetInnerHTML={{ __html: htmlBody }}
-                      />
-                    </div>
-                  ) : null}
-                </div>
               </div>
 
               {error ? <p className="text-sm text-rose-600">{error}</p> : null}

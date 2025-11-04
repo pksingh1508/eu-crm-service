@@ -3,7 +3,6 @@
 import EmailComposer from "./ui/email-composer";
 import LeadTimeline from "./ui/lead-timeline";
 import SendEmailButton from "./ui/send-email-button";
-import { emailTemplates } from "@/constants/email-templates";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -76,9 +75,7 @@ const LeadDetailPage = async ({
   const [{ data: eventsData }, { data: profileData }] = await Promise.all([
     supabaseAdmin
       .from("lead_events")
-      .select(
-        "id, event_type, payload, created_at, profiles:actor_id(full_name,email)"
-      )
+      .select("id, event_type, payload, created_at")
       .eq("lead_id", lead.id)
       .order("created_at", { ascending: false }),
     supabaseAdmin
@@ -87,13 +84,12 @@ const LeadDetailPage = async ({
       .eq("id", user.id)
       .maybeSingle()
   ]);
-
   const events = (eventsData ?? []) as unknown as LeadEventRow[];
   const workspaceEmailId = profileData?.workspace_email_id ?? null;
 
   const leadInfoItems = [
     { label: "Email", value: lead.email ?? "—" },
-    { label: "Company", value: lead.company ?? "—" },
+    // { label: "Company", value: lead.company ?? "—" },
     { label: "Phone", value: lead.phone ?? "—" },
     { label: "Status", value: lead.status },
     {
@@ -158,7 +154,6 @@ const LeadDetailPage = async ({
       <EmailComposer
         lead={{ id: lead.id, name: lead.name, email: lead.email }}
         workspaceEmailId={workspaceEmailId}
-        templates={emailTemplates}
       />
     </div>
   );

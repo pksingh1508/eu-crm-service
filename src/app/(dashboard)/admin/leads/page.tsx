@@ -18,6 +18,7 @@ type AdminLeadRow = {
   id: string;
   name: string;
   email: string | null;
+  phone: string | null;
   company: string | null;
   status: string;
   send_by: string | null;
@@ -43,7 +44,7 @@ const fetchLeads = async (params: SearchParams): Promise<AdminLeadRow[]> => {
   let leadsQuery = supabaseAdmin
     .from("leads")
     .select(
-      "id, name, email, company, status, send_by, assigned_to, created_at, profiles:assigned_to(full_name,email)"
+      "id, name, email, phone, company, status, send_by, assigned_to, created_at, profiles:assigned_to(full_name,email)"
     )
     .order("created_at", { ascending: false })
     .limit(100);
@@ -134,13 +135,10 @@ const AdminLeadsPage = async ({
         columns={[
           {
             key: "name",
-            header: "Lead",
+            header: "Name",
             render: (row) => (
               <div className="flex flex-col">
                 <span className="font-semibold text-slate-900">{row.name}</span>
-                <span className="text-xs text-slate-500">
-                  {row.company ?? "—"}
-                </span>
               </div>
             )
           },
@@ -148,6 +146,11 @@ const AdminLeadsPage = async ({
             key: "email",
             header: "Email",
             render: (row) => row.email ?? "—"
+          },
+          {
+            key: "phone",
+            header: "Phone",
+            render: (row) => row.phone ?? "—"
           },
           {
             key: "status",

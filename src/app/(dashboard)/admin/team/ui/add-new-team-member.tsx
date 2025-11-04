@@ -60,6 +60,16 @@ const AddNewTeamMember = () => {
           className="grid gap-4 md:grid-cols-2"
           autoComplete="off"
         >
+          <div className="grid gap-2 md:col-span-2">
+            <Label htmlFor="new-member-full-name">Full name</Label>
+            <Input
+              id="new-member-full-name"
+              name="fullName"
+              type="text"
+              required
+              placeholder="Jane Smith"
+            />
+          </div>
           <div className="grid gap-2 md:col-span-1">
             <Label htmlFor="new-member-email">Email address</Label>
             <Input

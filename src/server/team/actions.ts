@@ -52,6 +52,11 @@ export type CreateTeamMemberState = {
 };
 
 const createTeamMemberSchema = z.object({
+  fullName: z
+    .string()
+    .trim()
+    .min(2, "Enter the team member's full name.")
+    .max(120, "Full name must be 120 characters or fewer."),
   email: z
     .string()
     .email("Enter a valid email address.")
@@ -130,6 +135,7 @@ export const createTeamMemberAction = async (
   formData: FormData
 ): Promise<CreateTeamMemberState> => {
   const parsed = createTeamMemberSchema.safeParse({
+    fullName: formData.get("fullName"),
     email: formData.get("email"),
     password: formData.get("password")
   });
@@ -142,7 +148,7 @@ export const createTeamMemberAction = async (
     };
   }
 
-  const { email, password } = parsed.data;
+  const { email, password, fullName } = parsed.data;
 
   try {
     const { supabaseAdmin } = await ensureAdmin();
@@ -195,7 +201,8 @@ export const createTeamMemberAction = async (
       {
         id: userId,
         email,
-        role: "team"
+        role: "team",
+        full_name: fullName
       },
       {
         onConflict: "id"
