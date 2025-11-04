@@ -25,7 +25,7 @@ const toolbarOptions = [
   [{ header: [1, 2, 3, false] }],
   ["bold", "italic", "underline", "strike"],
   [{ list: "ordered" }, { list: "bullet" }],
-  ["link", "blockquote", "code-block"],
+  ["link", "image", "blockquote", "code-block"],
   [{ align: [] }],
   [{ color: [] }, { background: [] }],
   ["clean"]
@@ -42,6 +42,18 @@ const normalizeHtml = (html: string) => {
     return "";
   }
   return trimmed;
+};
+
+const enforceImageSize = (root: HTMLElement) => {
+  const images = root.querySelectorAll<HTMLImageElement>("img");
+  images.forEach((image) => {
+    image.width = 100;
+    image.height = 100;
+    image.style.width = "100px";
+    image.style.height = "100px";
+    image.style.objectFit = "contain";
+    image.style.display = "inline-block";
+  });
 };
 
 const QuillEditor = ({ value, onChange }: QuillEditorProps) => {
@@ -69,6 +81,7 @@ const QuillEditor = ({ value, onChange }: QuillEditorProps) => {
 
       if (value) {
         quillInstance.clipboard.dangerouslyPasteHTML(value);
+        enforceImageSize(quillInstance.root);
       }
 
       const handleChange = () => {
@@ -78,6 +91,43 @@ const QuillEditor = ({ value, onChange }: QuillEditorProps) => {
 
       handlerRef.current = handleChange;
       quillInstance.on("text-change", handleChange);
+
+      const toolbar = quillInstance.getModule("toolbar");
+      if (toolbar && typeof window !== "undefined") {
+        toolbar.addHandler("image", () => {
+          const rawUrl = window.prompt("Paste the image URL");
+          if (!rawUrl) {
+            return;
+          }
+
+          const url = rawUrl.trim();
+          if (!/^https?:\/\/.+/i.test(url)) {
+            toast.error(
+              "Provide a valid image URL starting with http or https."
+            );
+            return;
+          }
+
+          const selection = quillInstance.getSelection();
+          const index = selection ? selection.index : quillInstance.getLength();
+
+          quillInstance.insertEmbed(index, "image", url, "user");
+          enforceImageSize(quillInstance.root);
+
+          const leaf = quillInstance.getLeaf(index);
+          if (leaf && leaf[0] && leaf[0].domNode instanceof HTMLImageElement) {
+            const img = leaf[0].domNode as HTMLImageElement;
+            img.width = 100;
+            img.height = 100;
+            img.style.width = "100px";
+            img.style.height = "100px";
+            img.style.objectFit = "contain";
+            img.style.display = "inline-block";
+          }
+
+          quillInstance.setSelection(index + 1);
+        });
+      }
     };
 
     initialize();
@@ -99,12 +149,14 @@ const QuillEditor = ({ value, onChange }: QuillEditorProps) => {
     }
 
     const currentHtml = quill.root.innerHTML;
+    enforceImageSize(quill.root);
     const normalizedCurrent = normalizeHtml(currentHtml);
     const normalizedValue = normalizeHtml(value);
 
     if (normalizedValue !== normalizedCurrent) {
       const selection = quill.getSelection();
       quill.clipboard.dangerouslyPasteHTML(value || "");
+      enforceImageSize(quill.root);
       if (selection) {
         quill.setSelection(selection);
       }
@@ -161,7 +213,7 @@ const EmailTemplateManager = ({
   const latestTemplates = useMemo(() => {
     return [...templates].sort(
       (a, b) =>
-    new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     );
   }, [templates]);
 
@@ -180,9 +232,10 @@ const EmailTemplateManager = ({
 
   const closePreview = () => setIsPreviewOpen(false);
 
-const renderTextPreview = (html: string) =>
-  normalizeHtml(html)
-    .replace(/<\/?(p|div|section|h[1-6])>/gi, "\n\n")
+  const renderTextPreview = (html: string) =>
+    normalizeHtml(html)
+      .replace(/<img[^>]*src=["']([^"']+)["'][^>]*>/gi, "[Image: $1]")
+      .replace(/<\/?(p|div|section|h[1-6])>/gi, "\n\n")
       .replace(/<li>\s*/gi, "- ")
       .replace(/<\/li>/gi, "\n")
       .replace(/<br\s*\/?>/gi, "\n")
@@ -190,19 +243,19 @@ const renderTextPreview = (html: string) =>
       .replace(/<[^>]+>/g, "")
       .replace(/\u00a0/g, " ")
       .replace(/\s+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .replace(/[ \t]{2,}/g, " ")
-    .trim();
+      .replace(/\n{3,}/g, "\n\n")
+      .replace(/[ \t]{2,}/g, " ")
+      .trim();
 
-const formatTimestamp = (value: string) =>
-  new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone: "UTC"
-  }).format(new Date(value));
+  const formatTimestamp = (value: string) =>
+    new Intl.DateTimeFormat("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZone: "UTC"
+    }).format(new Date(value));
 
   return (
     <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
@@ -256,7 +309,8 @@ const formatTimestamp = (value: string) =>
               )}
               <p className="text-xs text-slate-500">
                 Format your email using the editor. Inline styles are stored for
-                HTML emails, and a plain-text version is generated automatically.
+                HTML emails, and a plain-text version is generated
+                automatically.
               </p>
             </div>
 
@@ -331,7 +385,8 @@ const formatTimestamp = (value: string) =>
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">
-                  Preview — {normalizeHtml(body) ? "Template" : "Empty template"}
+                  Preview —{" "}
+                  {normalizeHtml(body) ? "Template" : "Empty template"}
                 </h2>
                 <p className="text-xs text-slate-500">
                   Switch between HTML and plain-text views.

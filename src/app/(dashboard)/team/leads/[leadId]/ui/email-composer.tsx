@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
@@ -23,12 +23,8 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select";
-import generateEmailHTML, {
-  generateEmailPlainText,
-  WELCOME_TEMPLATE_SUBJECT
-} from "@/emails_templates/welcome_template";
-import { useAuthStore } from "@/stores/auth-store";
 import { useUiStore } from "@/stores/ui-store";
+import { useAuthStore } from "@/stores/auth-store";
 
 type LeadInfo = {
   id: string;
@@ -39,85 +35,85 @@ type LeadInfo = {
 type EmailComposerProps = {
   lead: LeadInfo;
   workspaceEmailId: string | null;
+  templates: EmailTemplateSummary[];
 };
 
-const TEMPLATE_OPTIONS = [
-  {
-    id: "welcome-template",
-    name: "EU Career Serwis | Welcome",
-    subject: WELCOME_TEMPLATE_SUBJECT
-  }
-] as const;
+type EmailTemplateSummary = {
+  id: string;
+  name: string;
+  subject: string;
+  bodyHtml: string | null;
+  bodyText: string | null;
+};
 
-const EmailComposer = ({ lead, workspaceEmailId }: EmailComposerProps) => {
+const htmlToPlainText = (html: string) =>
+  html
+    .replace(/<\/?(p|div|section|h[1-6])>/gi, "\n\n")
+    .replace(/<li>\s*/gi, "- ")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/ul>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+
+const plainTextToHtml = (text: string) =>
+  text
+    .split(/\n{2,}/)
+    .map((paragraph) => `<p>${paragraph.replace(/\n/g, "<br />")}</p>`)
+    .join("");
+
+const EmailComposer = ({
+  lead,
+  workspaceEmailId,
+  templates
+}: EmailComposerProps) => {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const { isEmailComposerOpen, activeLeadId, closeEmailComposer } =
     useUiStore();
 
-  const fallbackCandidateName = useMemo(
-    () => lead.name?.trim() || lead.email?.trim() || "Candidate",
-    [lead.name, lead.email]
-  );
-
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
     null
   );
-  const [candidateName, setCandidateName] = useState(fallbackCandidateName);
   const [subject, setSubject] = useState("");
   const [textBody, setTextBody] = useState("");
+  const [htmlBody, setHtmlBody] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const isOpen = isEmailComposerOpen && activeLeadId === lead.id;
 
-  const senderName = useMemo(() => {
-    if (user?.email) {
-      const [localPart] = user.email.split("@");
-      return localPart.replace(".", " ");
-    }
-    return "Team member";
-  }, [user?.email]);
-
-  const fallbackContactPerson = senderName;
-  const [contactPerson, setContactPerson] = useState(fallbackContactPerson);
-
   useEffect(() => {
     if (!isOpen) {
       setSelectedTemplateId(null);
       setSubject("");
       setTextBody("");
+      setHtmlBody(null);
       setFeedback(null);
       setError(null);
-      setCandidateName(fallbackCandidateName);
-      setContactPerson(fallbackContactPerson);
     }
-  }, [isOpen, fallbackCandidateName, fallbackContactPerson]);
-
-  const resolveCandidateName = () =>
-    candidateName.trim() || fallbackCandidateName || "Candidate";
-  const resolveContactPerson = () =>
-    contactPerson.trim() || fallbackContactPerson || "Team member";
+  }, [isOpen]);
 
   const applyTemplate = (templateId: string) => {
-    const template = TEMPLATE_OPTIONS.find((tpl) => tpl.id === templateId);
+    const template = templates.find((tpl) => tpl.id === templateId);
     if (!template) {
       return;
     }
 
     try {
-      const templateCandidateName = resolveCandidateName();
-      const templateContactPerson = resolveContactPerson();
-      const templateProps = {
-        candidateName: templateCandidateName,
-        contactPerson: templateContactPerson
-      };
-
-      const plainText = generateEmailPlainText(templateProps);
-
       setSubject(template.subject);
+      const plainText = template.bodyText?.trim().length
+        ? template.bodyText
+        : template.bodyHtml
+        ? htmlToPlainText(template.bodyHtml)
+        : "";
       setTextBody(plainText);
+      setHtmlBody(template.bodyHtml ?? null);
       setFeedback(null);
       setError(null);
     } catch (templateError) {
@@ -150,15 +146,10 @@ const EmailComposer = ({ lead, workspaceEmailId }: EmailComposerProps) => {
       return;
     }
 
-    const candidateForTemplate = resolveCandidateName();
-    const contactPersonForTemplate = resolveContactPerson();
-    const templateProps = {
-      candidateName: candidateForTemplate,
-      contactPerson: contactPersonForTemplate
-    };
-
-    const htmlBody =
-      selectedTemplateId !== null ? generateEmailHTML(templateProps) : null;
+    const templateHtml =
+      selectedTemplateId !== null
+        ? htmlBody ?? plainTextToHtml(trimmedTextBody)
+        : plainTextToHtml(trimmedTextBody);
 
     setIsSending(true);
     setError(null);
@@ -174,7 +165,7 @@ const EmailComposer = ({ lead, workspaceEmailId }: EmailComposerProps) => {
           leadId: lead.id,
           subject: trimmedSubject,
           textBody: trimmedTextBody,
-          htmlBody,
+          htmlBody: templateHtml,
           workspaceEmailId,
           replyTo: user?.email
         })
@@ -231,49 +222,18 @@ const EmailComposer = ({ lead, workspaceEmailId }: EmailComposerProps) => {
                     <SelectValue placeholder="Choose a template (optional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    {TEMPLATE_OPTIONS.map((template) => (
+                    {templates.length === 0 ? (
+                      <SelectItem value="" disabled>
+                        No templates available
+                      </SelectItem>
+                    ) : null}
+                    {templates.map((template) => (
                       <SelectItem key={template.id} value={template.id}>
                         {template.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div className="grid gap-2">
-                <label
-                  htmlFor="candidateName"
-                  className="text-sm font-medium text-slate-700"
-                >
-                  Candidate name
-                </label>
-                <Input
-                  id="candidateName"
-                  value={candidateName}
-                  onChange={(event) => setCandidateName(event.target.value)}
-                  placeholder={fallbackCandidateName}
-                />
-                <p className="text-xs text-slate-500">
-                  Update the candidate name before applying the template.
-                </p>
-              </div>
-
-              <div className="grid gap-2">
-                <label
-                  htmlFor="contactPerson"
-                  className="text-sm font-medium text-slate-700"
-                >
-                  Contact person
-                </label>
-                <Input
-                  id="contactPerson"
-                  value={contactPerson}
-                  onChange={(event) => setContactPerson(event.target.value)}
-                  placeholder={fallbackContactPerson}
-                />
-                <p className="text-xs text-slate-500">
-                  This name appears in the signature and body of the template.
-                </p>
               </div>
 
               <div className="grid gap-2">
@@ -301,7 +261,13 @@ const EmailComposer = ({ lead, workspaceEmailId }: EmailComposerProps) => {
                 <Textarea
                   id="textBody"
                   value={textBody}
-                  onChange={(event) => setTextBody(event.target.value)}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    setTextBody(value);
+                    if (selectedTemplateId && htmlBody) {
+                      setHtmlBody(null);
+                    }
+                  }}
                   rows={6}
                   placeholder="Compose your message..."
                 />

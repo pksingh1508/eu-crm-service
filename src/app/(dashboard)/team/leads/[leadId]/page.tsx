@@ -72,7 +72,11 @@ const LeadDetailPage = async ({
 
   const lead = leadData as LeadDetails;
 
-  const [{ data: eventsData }, { data: profileData }] = await Promise.all([
+  const [
+    { data: eventsData },
+    { data: profileData },
+    { data: templatesData }
+  ] = await Promise.all([
     supabaseAdmin
       .from("lead_events")
       .select("id, event_type, payload, created_at")
@@ -82,10 +86,22 @@ const LeadDetailPage = async ({
       .from("profiles")
       .select("workspace_email_id")
       .eq("id", user.id)
-      .maybeSingle()
+      .maybeSingle(),
+    supabaseAdmin
+      .from("email_templates")
+      .select("id, template_name, subject, body_html, body_text")
+      .order("updated_at", { ascending: false })
   ]);
   const events = (eventsData ?? []) as unknown as LeadEventRow[];
   const workspaceEmailId = profileData?.workspace_email_id ?? null;
+  const templates =
+    templatesData?.map((template) => ({
+      id: template.id,
+      name: template.template_name,
+      subject: template.subject,
+      bodyHtml: template.body_html,
+      bodyText: template.body_text
+    })) ?? [];
 
   const leadInfoItems = [
     { label: "Email", value: lead.email ?? "—" },
@@ -156,6 +172,7 @@ const LeadDetailPage = async ({
       <EmailComposer
         lead={{ id: lead.id, name: lead.name, email: lead.email }}
         workspaceEmailId={workspaceEmailId}
+        templates={templates}
       />
     </div>
   );
