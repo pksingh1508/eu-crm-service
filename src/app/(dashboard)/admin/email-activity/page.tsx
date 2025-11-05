@@ -46,7 +46,10 @@ const DATE_RANGES = [
 type SearchParams = {
   member?: string;
   range?: (typeof DATE_RANGES)[number]["value"];
+  page?: string;
 };
+
+const PAGE_SIZE = 20;
 
 const createdAtFormatter = new Intl.DateTimeFormat("en-US", {
   dateStyle: "short",
@@ -86,6 +89,10 @@ const EmailActivityPage = async ({
 
   const range = resolvedSearchParams.range ?? "all";
   const member = resolvedSearchParams.member ?? "all";
+  const parsedPage = Number.parseInt(resolvedSearchParams.page ?? "1", 10);
+  const page = Number.isNaN(parsedPage) || parsedPage < 1 ? 1 : parsedPage;
+  const offset = (page - 1) * PAGE_SIZE;
+  const limit = offset + PAGE_SIZE - 1;
   const rangeStart = getRangeStart(range);
 
   const { data: membersData, error: membersError } = await supabaseAdmin
@@ -103,10 +110,12 @@ const EmailActivityPage = async ({
 
   let eventsBuilder = supabaseAdmin
     .from("lead_events")
-    .select("id, created_at, payload, actor_id, lead:lead_id(name,email)")
+    .select(
+      "id, created_at, payload, actor_id, lead:lead_id(name,email)",
+      { count: "exact" }
+    )
     .eq("event_type", "email_sent")
-    .order("created_at", { ascending: false })
-    .limit(100);
+    .order("created_at", { ascending: false });
 
   if (member !== "all") {
     eventsBuilder = eventsBuilder.eq("actor_id", member);
@@ -116,7 +125,11 @@ const EmailActivityPage = async ({
     eventsBuilder = eventsBuilder.gte("created_at", rangeStart.toISOString());
   }
 
-  const { data: eventsData, error: eventsError } = await eventsBuilder;
+  const {
+    data: eventsData,
+    error: eventsError,
+    count: totalEventsCount
+  } = await eventsBuilder.range(offset, limit);
 
   if (eventsError) {
     console.error(
@@ -155,6 +168,32 @@ const EmailActivityPage = async ({
         : null
     } as EmailActivityRow;
   });
+
+  const totalCount = totalEventsCount ?? 0;
+  const totalPages = totalCount > 0 ? Math.ceil(totalCount / PAGE_SIZE) : 1;
+  const showPagination = totalCount > PAGE_SIZE;
+  const hasPrevious = page > 1;
+  const hasNext = page < totalPages;
+  const showingStart = totalCount === 0 ? 0 : offset + 1;
+  const showingEnd =
+    totalCount === 0 ? 0 : Math.min(offset + events.length, totalCount);
+  const buildPageHref = (targetPage: number) => {
+    const params = new URLSearchParams();
+    if (member !== "all") {
+      params.set("member", member);
+    }
+    if (range !== "all") {
+      params.set("range", range);
+    }
+    if (targetPage > 1) {
+      params.set("page", String(targetPage));
+    }
+    const queryString = params.toString();
+    return queryString
+      ? `/admin/email-activity?${queryString}`
+      : "/admin/email-activity";
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -269,6 +308,36 @@ const EmailActivityPage = async ({
         emptyMessage="No email events for the selected filters."
         rowKey={(row) => row.id}
       />
+      {showPagination ? (
+        <div className="flex flex-col items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600 md:flex-row">
+          <p>
+            Showing {showingStart}-{showingEnd} of {totalCount} activities
+          </p>
+          <div className="flex items-center gap-3">
+            {hasPrevious ? (
+              <Button variant="outline" asChild>
+                <a href={buildPageHref(page - 1)}>Previous</a>
+              </Button>
+            ) : (
+              <Button variant="outline" disabled>
+                Previous
+              </Button>
+            )}
+            <span className="text-xs font-medium text-slate-500">
+              Page {page} of {totalPages}
+            </span>
+            {hasNext ? (
+              <Button variant="outline" asChild>
+                <a href={buildPageHref(page + 1)}>Next</a>
+              </Button>
+            ) : (
+              <Button variant="outline" disabled>
+                Next
+              </Button>
+            )}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

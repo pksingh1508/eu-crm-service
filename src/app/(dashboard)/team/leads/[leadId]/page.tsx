@@ -5,6 +5,9 @@ import LeadTimeline from "./ui/lead-timeline";
 import SendEmailButton from "./ui/send-email-button";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 type LeadDetails = {
   id: string;
@@ -116,6 +119,14 @@ const LeadDetailPage = async ({
 
   return (
     <div className="space-y-6">
+      <div>
+        <Button variant="ghost" size="sm" asChild className="-ml-2 px-2">
+          <Link href="/team/leads" className="flex items-center gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back to leads
+          </Link>
+        </Button>
+      </div>
       <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
         <div>
           <p className="text-sm uppercase tracking-wide text-slate-500">Lead</p>
