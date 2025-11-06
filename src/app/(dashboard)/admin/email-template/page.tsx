@@ -5,7 +5,7 @@ const EmailTemplateAdminPage = async () => {
   const supabaseAdmin = getSupabaseAdminClient();
   const { data, error } = await supabaseAdmin
     .from("email_templates")
-    .select("id, template_name, subject, created_at, updated_at")
+    .select("id, template_name, subject, body_html, created_at, updated_at")
     .order("updated_at", { ascending: false });
 
   if (error) {
@@ -17,6 +17,7 @@ const EmailTemplateAdminPage = async () => {
       id: template.id,
       templateName: template.template_name,
       subject: template.subject,
+      bodyHtml: template.body_html ?? "",
       createdAt: template.created_at,
       updatedAt: template.updated_at
     })) ?? [];

@@ -50,6 +50,12 @@ const createEmailTemplateSchema = z.object({
     .min(1, "Email body cannot be empty.")
 });
 
+const templateIdSchema = z
+  .string()
+  .trim()
+  .min(1, "Email template is required.")
+  .uuid("Invalid email template.");
+
 const htmlToPlainText = (html: string): string =>
   html
     .replace(/<\/?(p|div|section|h[1-6])>/gi, "\n\n")
@@ -68,6 +74,7 @@ export type EmailTemplateSummary = {
   id: string;
   templateName: string;
   subject: string;
+  bodyHtml: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -82,6 +89,24 @@ export const createEmailTemplateAction = async (
   _prev: CreateEmailTemplateState,
   formData: FormData
 ): Promise<CreateEmailTemplateState> => {
+  const templateIdValue = formData.get("templateId");
+  const templateId =
+    typeof templateIdValue === "string" && templateIdValue.trim().length > 0
+      ? templateIdValue.trim()
+      : null;
+
+  if (templateId) {
+    const parsedId = templateIdSchema.safeParse(templateId);
+    if (!parsedId.success) {
+      const issue = parsedId.error.issues[0];
+      return {
+        success: false,
+        error:
+          issue?.message ?? "Unable to identify the email template to update."
+      };
+    }
+  }
+
   const parsed = createEmailTemplateSchema.safeParse({
     templateName: formData.get("templateName"),
     subject: formData.get("subject"),
@@ -102,6 +127,43 @@ export const createEmailTemplateAction = async (
   try {
     const { supabaseAdmin, userId } = await ensureAdmin();
 
+    if (templateId) {
+      const { data, error } = await supabaseAdmin
+        .from("email_templates")
+        .update({
+          template_name: templateName,
+          subject,
+          body_html: body,
+          body_text: plainText
+        })
+        .eq("id", templateId)
+        .select("id, template_name, subject, body_html, created_at, updated_at")
+        .maybeSingle();
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data) {
+        return {
+          success: false,
+          error: "Email template not found."
+        };
+      }
+
+      return {
+        success: true,
+        template: {
+          id: data.id,
+          templateName: data.template_name,
+          subject: data.subject,
+          bodyHtml: data.body_html,
+          createdAt: data.created_at,
+          updatedAt: data.updated_at
+        }
+      };
+    }
+
     const { data, error } = await supabaseAdmin
       .from("email_templates")
       .insert({
@@ -111,7 +173,7 @@ export const createEmailTemplateAction = async (
         body_text: plainText,
         created_by: userId
       })
-      .select("id, template_name, subject, created_at, updated_at")
+      .select("id, template_name, subject, body_html, created_at, updated_at")
       .single();
 
     if (error) {
@@ -124,6 +186,7 @@ export const createEmailTemplateAction = async (
         id: data.id,
         templateName: data.template_name,
         subject: data.subject,
+        bodyHtml: data.body_html,
         createdAt: data.created_at,
         updatedAt: data.updated_at
       }
@@ -135,6 +198,52 @@ export const createEmailTemplateAction = async (
       error instanceof Error
         ? error.message
         : "Unable to save email template. Try again later.";
+
+    return {
+      success: false,
+      error: message
+    };
+  }
+};
+
+export type DeleteEmailTemplateState = {
+  success: boolean;
+  error?: string;
+};
+
+export const deleteEmailTemplateAction = async (
+  templateId: string
+): Promise<DeleteEmailTemplateState> => {
+  const parsedId = templateIdSchema.safeParse(templateId);
+
+  if (!parsedId.success) {
+    const issue = parsedId.error.issues[0];
+    return {
+      success: false,
+      error: issue?.message ?? "Invalid email template."
+    };
+  }
+
+  try {
+    const { supabaseAdmin } = await ensureAdmin();
+
+    const { error } = await supabaseAdmin
+      .from("email_templates")
+      .delete()
+      .eq("id", parsedId.data);
+
+    if (error) {
+      throw error;
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("[email-template] delete failed", error);
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Unable to delete email template. Try again later.";
 
     return {
       success: false,

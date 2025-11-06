@@ -1,6 +1,14 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useActionState,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition
+} from "react";
+import { Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -11,7 +19,8 @@ import { Spinner } from "@/components/ui/spinner";
 import {
   CreateEmailTemplateState,
   EmailTemplateSummary,
-  createEmailTemplateAction
+  createEmailTemplateAction,
+  deleteEmailTemplateAction
 } from "@/server/email-templates/actions";
 
 import "quill/dist/quill.snow.css";
@@ -487,8 +496,18 @@ const EmailTemplateManager = ({
   const formRef = useRef<HTMLFormElement | null>(null);
   const [templates, setTemplates] =
     useState<EmailTemplateSummary[]>(initialTemplates);
+  const [templateName, setTemplateName] = useState("");
+  const [subject, setSubject] = useState("");
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(
+    null
+  );
+  const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(
+    null
+  );
   const [body, setBody] = useState("");
+  const wasEditingOnSubmit = useRef(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [isDeletePending, startDeleteTransition] = useTransition();
 
   const [state, formAction, isPending] = useActionState<
     CreateEmailTemplateState,
@@ -501,15 +520,25 @@ const EmailTemplateManager = ({
 
   useEffect(() => {
     if (state.success) {
-      if (state.template) {
+      const template = state.template;
+
+      if (template) {
         setTemplates((prev) => [
-          state.template!,
-          ...prev.filter((tpl) => tpl.id !== state.template!.id)
+          template,
+          ...prev.filter((tpl) => tpl.id !== template.id)
         ]);
       }
+
+      const wasEditing = wasEditingOnSubmit.current;
       setBody("");
+      setTemplateName("");
+      setSubject("");
+      setEditingTemplateId(null);
       formRef.current?.reset();
-      toast.success("Email template saved");
+      wasEditingOnSubmit.current = false;
+      toast.success(
+        wasEditing ? "Email template updated" : "Email template saved"
+      );
     } else if (state.error) {
       toast.error(state.error);
     }
@@ -536,6 +565,79 @@ const EmailTemplateManager = ({
   };
 
   const closePreview = () => setIsPreviewOpen(false);
+
+  const handleFormSubmit = () => {
+    wasEditingOnSubmit.current = editingTemplateId !== null;
+  };
+
+  const handleEditTemplate = (template: EmailTemplateSummary) => {
+    setTemplateName(template.templateName);
+    setSubject(template.subject);
+    setBody(template.bodyHtml);
+    setEditingTemplateId(template.id);
+    wasEditingOnSubmit.current = false;
+    if (isPreviewOpen) {
+      setIsPreviewOpen(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingTemplateId(null);
+    setTemplateName("");
+    setSubject("");
+    setBody("");
+    formRef.current?.reset();
+    wasEditingOnSubmit.current = false;
+  };
+
+  const handleDeleteTemplate = (templateId: string) => {
+    if (isDeletePending && deletingTemplateId === templateId) {
+      return;
+    }
+
+    if (typeof window !== "undefined") {
+      const confirmed = window.confirm(
+        "Delete this template permanently? This action cannot be undone."
+      );
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    setDeletingTemplateId(templateId);
+    startDeleteTransition(() => {
+      deleteEmailTemplateAction(templateId)
+        .then((result) => {
+          if (!result.success) {
+            toast.error(
+              result.error ??
+                "Unable to delete email template. Try again later."
+            );
+            return;
+          }
+
+          setTemplates((prev) => prev.filter((tpl) => tpl.id !== templateId));
+
+          if (editingTemplateId === templateId) {
+            setEditingTemplateId(null);
+            setTemplateName("");
+            setSubject("");
+            setBody("");
+            formRef.current?.reset();
+            wasEditingOnSubmit.current = false;
+          }
+
+          toast.success("Email template deleted");
+        })
+        .catch((error) => {
+          console.error("[email-template] delete error", error);
+          toast.error("Unable to delete email template. Try again later.");
+        })
+        .finally(() => {
+          setDeletingTemplateId(null);
+        });
+    });
+  };
 
   const renderTextPreview = (html: string) =>
     normalizeHtml(html)
@@ -574,9 +676,13 @@ const EmailTemplateManager = ({
           <form
             ref={formRef}
             action={formAction}
+            onSubmit={handleFormSubmit}
             className="grid gap-4"
             autoComplete="off"
           >
+            {editingTemplateId ? (
+              <input type="hidden" name="templateId" value={editingTemplateId} />
+            ) : null}
             <div className="grid gap-2">
               <Label htmlFor="templateName">Template name</Label>
               <Input
@@ -585,6 +691,8 @@ const EmailTemplateManager = ({
                 type="text"
                 placeholder="Welcome follow-up"
                 required
+                value={templateName}
+                onChange={(event) => setTemplateName(event.target.value)}
               />
             </div>
 
@@ -596,6 +704,8 @@ const EmailTemplateManager = ({
                 type="text"
                 placeholder="Welcome to EU Prime Serwis"
                 required
+                value={subject}
+                onChange={(event) => setSubject(event.target.value)}
               />
             </div>
 
@@ -608,7 +718,7 @@ const EmailTemplateManager = ({
                 <div className="flex min-h-[280px] items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
                   <Spinner className="mr-2 text-slate-600" />
                   <span className="text-sm text-slate-600">
-                    Initializing editor…
+                    Initializing editor...
                   </span>
                 </div>
               )}
@@ -623,25 +733,40 @@ const EmailTemplateManager = ({
               <p className="text-sm text-rose-600">{state.error}</p>
             ) : null}
 
-            <div className="flex justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <Button
                 type="button"
                 variant="outline"
                 className="gap-2"
                 onClick={handlePreview}
+                disabled={isPending}
               >
                 Preview
               </Button>
-              <Button type="submit" disabled={isPending}>
-                {isPending ? (
-                  <>
-                    <Spinner className="mr-2 text-white" />
-                    Saving…
-                  </>
-                ) : (
-                  "Save template"
-                )}
-              </Button>
+              <div className="flex items-center gap-2">
+                {editingTemplateId ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCancelEdit}
+                    disabled={isPending}
+                  >
+                    Cancel edit
+                  </Button>
+                ) : null}
+                <Button type="submit" disabled={isPending}>
+                  {isPending ? (
+                    <>
+                      <Spinner className="mr-2 text-white" />
+                      {editingTemplateId ? "Updating..." : "Saving..."}
+                    </>
+                  ) : editingTemplateId ? (
+                    "Update template"
+                  ) : (
+                    "Save template"
+                  )}
+                </Button>
+              </div>
             </div>
           </form>
         </CardContent>
@@ -665,18 +790,55 @@ const EmailTemplateManager = ({
                   key={template.id}
                   className="rounded-lg border border-slate-200 p-4 shadow-sm"
                 >
-                  <h3 className="text-sm font-semibold text-slate-900">
-                    {template.templateName}
-                  </h3>
-                  <p className="mt-1 text-xs text-slate-500">
-                    Subject:{" "}
-                    <span className="font-medium text-slate-700">
-                      {template.subject}
-                    </span>
-                  </p>
-                  <p className="mt-2 text-xs text-slate-400">
-                    Updated {formatTimestamp(template.updatedAt)} UTC
-                  </p>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <h3 className="text-sm font-semibold text-slate-900">
+                        {template.templateName}
+                      </h3>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Subject:{" "}
+                        <span className="font-medium text-slate-700">
+                          {template.subject}
+                        </span>
+                      </p>
+                      <p className="mt-2 text-xs text-slate-400">
+                        Updated {formatTimestamp(template.updatedAt)} UTC
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEditTemplate(template)}
+                        disabled={
+                          isPending ||
+                          (isDeletePending && deletingTemplateId === template.id)
+                        }
+                        aria-label="Edit template"
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="text-rose-500 hover:text-rose-600 focus-visible:ring-rose-500"
+                        onClick={() => handleDeleteTemplate(template.id)}
+                        disabled={
+                          isPending ||
+                          (isDeletePending && deletingTemplateId === template.id)
+                        }
+                        aria-label="Delete template"
+                      >
+                        {isDeletePending && deletingTemplateId === template.id ? (
+                          <Spinner className="text-rose-500" />
+                        ) : (
+                          <Trash2 className="size-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
                 </li>
               ))}
             </ul>
