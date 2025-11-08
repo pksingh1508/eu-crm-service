@@ -207,8 +207,9 @@ const QuillEditor = ({ value, onChange }: QuillEditorProps) => {
         Quill.register(Size, true);
 
         const Color = Quill.import("attributors/style/color");
-        (Color as unknown as QuillWhitelistAttributor).whitelist =
-          COLOR_OPTIONS;
+        // Allow the editor to retain any custom color (not only our palette),
+        // otherwise Quill strips colors when rehydrating saved HTML.
+        (Color as unknown as QuillWhitelistAttributor).whitelist = undefined;
         // @ts-ignore
         Quill.register(Color, true);
 
