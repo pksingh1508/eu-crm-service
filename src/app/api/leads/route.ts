@@ -39,6 +39,7 @@ const leadInputSchema = z.object({
     .max(50, "Phone must be under 50 characters.")
     .optional(),
   notes: z.string().optional(),
+  message: z.string().optional(),
   status: leadStatus.optional(),
   source: z.record(z.string(), z.unknown()).optional(),
   assignedTo: z.string().uuid().optional()
@@ -125,6 +126,7 @@ export const POST = async (request: Request) => {
     company: payload.company ?? null,
     phone: payload.phone ?? null,
     notes: payload.notes ?? null,
+    message: payload.message ?? null,
     status: payload.status ?? undefined,
     source: payload.source ?? null,
     assigned_to: payload.assignedTo ?? null
