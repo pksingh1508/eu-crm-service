@@ -1,28 +1,28 @@
-'use server'
+"use server";
 
-import { Resend } from "resend"
+import { Resend } from "resend";
 
-import { env } from "../env"
+import { env } from "../env";
 
-const resend = new Resend(env.RESEND_API_KEY)
+const resend = new Resend(env.RESEND_API_KEY);
 
-const FROM_ADDRESS = "ashutosh@eucareerserwis.pl"
-const TO_ADDRESS = "pawankumarlearner@gmail.com"
+const FROM_ADDRESS = "ashutosh@eucareerserwis.pl";
+const TO_ADDRESS = "office@eucareerserwis.pl";
 
 type SendOtpParams = {
-  otp: string
-  userEmail: string
-}
+  otp: string;
+  userEmail: string;
+};
 
 export const sendOtpEmail = async ({ otp, userEmail }: SendOtpParams) => {
-  const subject = "Your EU CRM one-time passcode"
+  const subject = "Your EU CRM one-time passcode";
   const textBody = [
     `Hi,`,
     "",
     `Use the following one-time passcode to finish signing in: ${otp}`,
     "",
     "This code expires in 5 minutes. If you did not request it, you can ignore this email."
-  ].join("\n")
+  ].join("\n");
 
   return resend.emails.send({
     from: FROM_ADDRESS,
@@ -38,5 +38,5 @@ export const sendOtpEmail = async ({ otp, userEmail }: SendOtpParams) => {
         <p>This code expires in 5 minutes. If you did not request it, you can ignore this email.</p>
       </div>
     `
-  })
-}
+  });
+};
