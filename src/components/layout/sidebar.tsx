@@ -1,9 +1,9 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
-import { useTransition } from "react"
-import { toast } from "sonner"
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { useTransition } from "react";
+import { toast } from "sonner";
 import {
   BarChart3,
   Inbox,
@@ -11,20 +11,21 @@ import {
   Mail,
   Users,
   FileText
-} from "lucide-react"
+} from "lucide-react";
 
-import { cn } from "@/lib/utils"
-import { useAuthStore, type UserRole } from "@/stores/auth-store"
-import { logoutAction } from "@/server/auth/actions"
-import { Button } from "@/components/ui/button"
-import { Spinner } from "@/components/ui/spinner"
+import { cn } from "@/lib/utils";
+import { useAuthStore, type UserRole } from "@/stores/auth-store";
+import { logoutAction } from "@/server/auth/actions";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
+import Image from "next/image";
 
 type NavItem = {
-  href: string
-  label: string
-  icon: React.ComponentType<{ className?: string }>
-  description?: string
-}
+  href: string;
+  label: string;
+  icon: React.ComponentType<{ className?: string }>;
+  description?: string;
+};
 
 const NAVIGATION: Record<Exclude<UserRole, null>, NavItem[]> = {
   admin: [
@@ -85,18 +86,18 @@ const NAVIGATION: Record<Exclude<UserRole, null>, NavItem[]> = {
       description: "Send & review emails"
     }
   ]
-}
+};
 
 const SidebarNavItem = ({ item }: { item: NavItem }) => {
-  const pathname = usePathname()
-  const isExactMatch = pathname === item.href
-  const segments = item.href.split("/").filter(Boolean)
-  const allowNestedMatch = segments.length > 1
+  const pathname = usePathname();
+  const isExactMatch = pathname === item.href;
+  const segments = item.href.split("/").filter(Boolean);
+  const allowNestedMatch = segments.length > 1;
   const isNestedRoute =
-    allowNestedMatch && !isExactMatch && pathname?.startsWith(`${item.href}/`)
-  const isActive = isExactMatch || Boolean(isNestedRoute)
+    allowNestedMatch && !isExactMatch && pathname?.startsWith(`${item.href}/`);
+  const isActive = isExactMatch || Boolean(isNestedRoute);
 
-  const Icon = item.icon
+  const Icon = item.icon;
 
   return (
     <Link
@@ -112,7 +113,9 @@ const SidebarNavItem = ({ item }: { item: NavItem }) => {
         <Icon
           className={cn(
             "h-4 w-4 transition",
-            isActive ? "text-white" : "text-slate-500 group-hover:text-slate-900"
+            isActive
+              ? "text-white"
+              : "text-slate-500 group-hover:text-slate-900"
           )}
         />
         <span className="text-sm font-semibold">{item.label}</span>
@@ -121,37 +124,39 @@ const SidebarNavItem = ({ item }: { item: NavItem }) => {
         <p
           className={cn(
             "text-xs",
-            isActive ? "text-slate-200" : "text-slate-400 group-hover:text-slate-600"
+            isActive
+              ? "text-slate-200"
+              : "text-slate-400 group-hover:text-slate-600"
           )}
         >
           {item.description}
         </p>
       ) : null}
     </Link>
-  )
-}
+  );
+};
 
 const Sidebar = ({ className }: { className?: string }) => {
-  const role = useAuthStore((state) => state.role)
-  const isInitialized = useAuthStore((state) => state.isInitialized)
-  const clearAuth = useAuthStore((state) => state.clear)
-  const router = useRouter()
-  const [isLoggingOut, startLogout] = useTransition()
+  const role = useAuthStore((state) => state.role);
+  const isInitialized = useAuthStore((state) => state.isInitialized);
+  const clearAuth = useAuthStore((state) => state.clear);
+  const router = useRouter();
+  const [isLoggingOut, startLogout] = useTransition();
 
-  const navItems = role ? NAVIGATION[role] : []
+  const navItems = role ? NAVIGATION[role] : [];
 
   const handleLogout = () => {
     startLogout(async () => {
       try {
-        await logoutAction()
-        clearAuth()
-        toast.success("Logout successfully")
-        router.push("/login")
+        await logoutAction();
+        clearAuth();
+        toast.success("Logout successfully");
+        router.push("/login");
       } catch (error) {
-        console.error("[sidebar] logout failed", error)
+        console.error("[sidebar] logout failed", error);
       }
-    })
-  }
+    });
+  };
 
   return (
     <aside
@@ -161,13 +166,17 @@ const Sidebar = ({ className }: { className?: string }) => {
       )}
     >
       <div className="flex h-20 items-center gap-2 border-b border-slate-200 px-6">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-base font-semibold text-white">
-          EU
+        <div className="flex h-10 w-10 items-center justify-center rounded-full">
+          <Image
+            src="/euLogo.jpeg"
+            alt="EU CRM Logo"
+            width={40}
+            height={40}
+            className="rounded-full"
+          />
         </div>
         <div>
-          <span className="text-sm font-semibold text-slate-900">
-            EU CRM
-          </span>
+          <span className="text-sm font-semibold text-slate-900">EU CRM</span>
           <p className="text-xs text-slate-500">Lead engagement workspace</p>
         </div>
       </div>
@@ -211,7 +220,7 @@ const Sidebar = ({ className }: { className?: string }) => {
         </p>
       </div>
     </aside>
-  )
-}
+  );
+};
 
-export default Sidebar
+export default Sidebar;
