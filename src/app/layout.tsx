@@ -30,7 +30,15 @@ const RootLayout = async ({
   let workspaceEmailId: string | null = null;
 
   if (userError) {
-    console.error("[layout] failed to verify auth user", userError);
+    const isMissingSession =
+      typeof userError.message === "string" &&
+      userError.message.includes("Auth session missing");
+
+    if (isMissingSession) {
+      console.debug("[layout] no active auth session");
+    } else {
+      console.error("[layout] failed to verify auth user", userError);
+    }
   }
 
   if (user) {

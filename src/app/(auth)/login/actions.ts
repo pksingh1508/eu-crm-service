@@ -3,7 +3,7 @@
 import { cookies } from "next/headers"
 import { z } from "zod"
 
-import { env } from "@/lib/env"
+import { dispatchOtpForUser } from "@/server/auth/otp"
 import { getSupabaseAdminClient } from "@/lib/supabase/admin"
 
 type LoginState = {
@@ -68,18 +68,13 @@ export const loginAction = async (
     maxAge: 5 * 60
   })
 
-  const response = await fetch(`${env.NEXT_PUBLIC_APP_URL}/api/send-otp`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
+  try {
+    await dispatchOtpForUser({
       userId: pendingPayload.user_id,
       email: pendingPayload.email
     })
-  })
-
-  if (!response.ok) {
+  } catch (error) {
+    console.error("[login] failed to dispatch OTP", error)
     cookieStore.delete("pending_session")
     return {
       success: false,
