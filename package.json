@@ -32,6 +32,7 @@
     "next-themes": "^0.4.6",
     "nodemailer": "^7.0.10",
     "quill": "^2.0.3",
+    "quill-better-table": "^1.2.10",
     "quill-delta": "^5.1.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",

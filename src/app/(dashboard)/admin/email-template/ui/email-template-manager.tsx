@@ -6,7 +6,7 @@ import {
   useMemo,
   useRef,
   useState,
-  useTransition
+  useTransition,
 } from "react";
 import { Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -20,10 +20,11 @@ import {
   CreateEmailTemplateState,
   EmailTemplateSummary,
   createEmailTemplateAction,
-  deleteEmailTemplateAction
+  deleteEmailTemplateAction,
 } from "@/server/email-templates/actions";
 
 import "quill/dist/quill.snow.css";
+import "quill-better-table/dist/quill-better-table.css";
 
 type QuillEditorProps = {
   value: string;
@@ -44,47 +45,80 @@ type QuillWhitelistAttributor = {
   whitelist: string[] | undefined;
 };
 
+type RelativeRect = {
+  x: number;
+  y: number;
+  x1: number;
+  y1: number;
+  width: number;
+  height: number;
+};
+
+type QuillTableCellBlot = {
+  domNode: HTMLElement;
+};
+
+type QuillTableContainerBlot = {
+  insertRow: (
+    compareRect: RelativeRect,
+    isDown: boolean,
+    editorWrapper: HTMLElement,
+  ) => QuillTableCellBlot[] | undefined;
+};
+
+type QuillTableModule = {
+  getTable: (
+    range?: QuillRange | null,
+  ) => [
+    QuillTableContainerBlot | null,
+    unknown | null,
+    QuillTableCellBlot | null,
+    number,
+  ];
+  insertTable: (rows: number, columns: number) => void;
+};
+
 const FONT_FAMILIES = [
   {
     label: "Sofia Pro",
     value: "Sofia Pro",
-    css: '"Sofia Pro", "Helvetica", "Arial", sans-serif'
+    css: '"Sofia Pro", "Helvetica", "Arial", sans-serif',
   },
   {
     label: "Slabo 13px",
     value: "Slabo 13px",
-    css: '"Slabo 13px", "Times New Roman", serif'
+    css: '"Slabo 13px", "Times New Roman", serif',
   },
   {
     label: "Roboto Slab",
     value: "Roboto Slab",
-    css: '"Roboto Slab", "Roboto", "Helvetica", sans-serif'
+    css: '"Roboto Slab", "Roboto", "Helvetica", sans-serif',
   },
   {
     label: "Inconsolata",
     value: "Inconsolata",
-    css: '"Inconsolata", "Courier New", monospace'
+    css: '"Inconsolata", "Courier New", monospace',
   },
   {
     label: "Ubuntu Mono",
     value: "Ubuntu Mono",
-    css: '"Ubuntu Mono", "Courier New", monospace'
+    css: '"Ubuntu Mono", "Courier New", monospace',
   },
   {
     label: "Georgia",
     value: "Georgia",
-    css: '"Georgia", serif'
+    css: '"Georgia", serif',
   },
   {
     label: "Arial",
     value: "Arial",
-    css: '"Arial", "Helvetica", sans-serif'
+    css: '"Arial", "Helvetica", sans-serif',
   },
   {
     label: "Verdana",
     value: "Verdana",
-    css: '"Verdana", "Geneva", sans-serif'
-  }
+    css: '"Verdana", "Geneva", sans-serif',
+  },
 ];
 
 const FONT_SIZE_OPTIONS = ["12px", "14px", "16px", "18px", "24px", "32px"];
@@ -125,27 +159,51 @@ const COLOR_OPTIONS = [
   "#003700",
   "#002966",
   "#3D1466",
-  "#F9C801"
+  "#F9C801",
 ];
 
 const toolbarOptions = [
   [
     { font: FONT_FAMILIES.map((font) => font.value) },
-    { size: FONT_SIZE_OPTIONS }
+    { size: FONT_SIZE_OPTIONS },
   ],
   [{ header: [1, 2, 3, false] }],
   ["bold", "italic", "underline", "strike"],
   [{ list: "ordered" }, { list: "bullet" }],
-  ["link", "image", "blockquote", "code-block"],
+  ["link", "image", "blockquote", "code-block", "insertTable", "tableRow"],
   [{ align: [] }],
   [{ color: COLOR_OPTIONS }, { background: [] }, "customColor"],
-  ["clean"]
+  ["clean"],
 ];
 
 let quillFormattingRegistered = false;
 let quillToolbarStylesInjected = false;
 
 const DEFAULT_TEXT_COLOR = "#000000";
+const DEFAULT_TABLE_COLUMNS = 2;
+const DEFAULT_TABLE_ROWS = 1;
+const EMAIL_TABLE_BORDER_COLOR = "#cbd5e1";
+const INSERT_TABLE_ICON = `
+  <svg viewBox="0 0 18 18" aria-hidden="true">
+    <rect x="2.5" y="2.5" width="9" height="9" rx="0.5" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
+    <line x1="2.5" y1="5.5" x2="11.5" y2="5.5" stroke="currentColor" stroke-width="1.5"></line>
+    <line x1="2.5" y1="8.5" x2="11.5" y2="8.5" stroke="currentColor" stroke-width="1.5"></line>
+    <line x1="5.5" y1="2.5" x2="5.5" y2="11.5" stroke="currentColor" stroke-width="1.5"></line>
+    <line x1="8.5" y1="2.5" x2="8.5" y2="11.5" stroke="currentColor" stroke-width="1.5"></line>
+    <line x1="14" y1="5" x2="14" y2="13" stroke="currentColor" stroke-width="1.5"></line>
+    <line x1="10" y1="9" x2="18" y2="9" stroke="currentColor" stroke-width="1.5"></line>
+  </svg>
+`;
+const INSERT_ROW_ICON = `
+  <svg viewBox="0 0 18 18" aria-hidden="true">
+    <rect x="2.5" y="2.5" width="13" height="9" rx="0.5" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
+    <line x1="2.5" y1="5.5" x2="15.5" y2="5.5" stroke="currentColor" stroke-width="1.5"></line>
+    <line x1="6.8" y1="2.5" x2="6.8" y2="11.5" stroke="currentColor" stroke-width="1.5"></line>
+    <line x1="11.2" y1="2.5" x2="11.2" y2="11.5" stroke="currentColor" stroke-width="1.5"></line>
+    <line x1="9" y1="13" x2="9" y2="17" stroke="currentColor" stroke-width="1.5"></line>
+    <line x1="7" y1="15" x2="11" y2="15" stroke="currentColor" stroke-width="1.5"></line>
+  </svg>
+`;
 
 const EDITOR_SCROLL_HEIGHT = 360;
 
@@ -174,13 +232,67 @@ const enforceImageSize = (root: HTMLElement) => {
   });
 };
 
+const enforceAnchorAttributes = (root: HTMLElement) => {
+  const anchors = root.querySelectorAll<HTMLAnchorElement>("a[href]");
+  anchors.forEach((anchor) => {
+    anchor.setAttribute("target", "_blank");
+    anchor.setAttribute("rel", "noopener noreferrer");
+  });
+};
+
+const enforceTableStyles = (root: HTMLElement) => {
+  const tables = root.querySelectorAll<HTMLTableElement>("table");
+  tables.forEach((table) => {
+    table.setAttribute("cellpadding", "0");
+    table.setAttribute("cellspacing", "0");
+    table.style.width = "100%";
+    table.style.maxWidth = "100%";
+    table.style.margin = "16px 0";
+    table.style.borderCollapse = "collapse";
+    table.style.tableLayout = "fixed";
+    table.style.border = `1px solid ${EMAIL_TABLE_BORDER_COLOR}`;
+
+    const cells = table.querySelectorAll<HTMLElement>("th, td");
+    cells.forEach((cell) => {
+      cell.style.border = `1px solid ${EMAIL_TABLE_BORDER_COLOR}`;
+      cell.style.padding = "10px 12px";
+      cell.style.verticalAlign = "top";
+      cell.style.wordBreak = "break-word";
+    });
+  });
+};
+
+const enforceEditorContentStyles = (root: HTMLElement) => {
+  enforceImageSize(root);
+  enforceAnchorAttributes(root);
+  enforceTableStyles(root);
+};
+
+const getRelativeRect = (
+  targetRect: DOMRect | { x: number; y: number; width: number; height: number },
+  container: HTMLElement,
+): RelativeRect => {
+  const containerRect = container.getBoundingClientRect();
+
+  return {
+    x: targetRect.x - containerRect.x - container.scrollLeft,
+    y: targetRect.y - containerRect.y - container.scrollTop,
+    x1:
+      targetRect.x - containerRect.x - container.scrollLeft + targetRect.width,
+    y1:
+      targetRect.y - containerRect.y - container.scrollTop + targetRect.height,
+    width: targetRect.width,
+    height: targetRect.height,
+  };
+};
+
 const QuillEditor = ({ value, onChange }: QuillEditorProps) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const quillRef = useRef<any>(null);
   const handlerRef = useRef<(() => void) | null>(null);
   const customColorInputRef = useRef<HTMLInputElement | null>(null);
   const customColorChangeHandlerRef = useRef<((event: Event) => void) | null>(
-    null
+    null,
   );
   const customColorSelectionRef = useRef<QuillRange | null>(null);
 
@@ -189,11 +301,14 @@ const QuillEditor = ({ value, onChange }: QuillEditorProps) => {
 
     const initialize = async () => {
       const { default: Quill } = await import("quill");
+      const { default: QuillBetterTable } = await import("quill-better-table");
       if (!isMounted || !containerRef.current) {
         return;
       }
 
       if (!quillFormattingRegistered) {
+        Quill.register({ "modules/better-table": QuillBetterTable }, true);
+
         const Font = Quill.import("attributors/style/font");
         (Font as unknown as QuillWhitelistAttributor).whitelist =
           FONT_FAMILIES.map((font) => font.value);
@@ -230,7 +345,7 @@ const QuillEditor = ({ value, onChange }: QuillEditorProps) => {
             .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="${font.value}"] {
               font-family: ${font.css};
             }
-          `
+          `,
         ).join("\n");
 
         const sizeStyleRules = FONT_SIZE_OPTIONS.map(
@@ -244,19 +359,68 @@ const QuillEditor = ({ value, onChange }: QuillEditorProps) => {
               font-size: ${size};
               line-height: 1.2;
             }
-          `
+          `,
         ).join("\n");
         styleElement.textContent = `
-          .ql-snow .ql-toolbar button.ql-customColor::before {
-            content: "Clr";
-            font-size: 11px;
-            letter-spacing: 0.05em;
-          }
           .ql-snow .ql-toolbar button.ql-customColor {
             display: inline-flex;
             align-items: center;
             justify-content: center;
             min-width: 2.5rem;
+            color: #111827;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.05em;
+          }
+          .ql-snow .ql-toolbar button.ql-insertTable {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            color: #111827;
+          }
+          .ql-snow .ql-toolbar button.ql-tableRow {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            color: #111827;
+          }
+          .ql-snow .ql-toolbar button.ql-customColor,
+          .ql-snow .ql-toolbar button.ql-insertTable,
+          .ql-snow .ql-toolbar button.ql-tableRow {
+            line-height: 1;
+            white-space: nowrap;
+          }
+          .ql-snow .ql-toolbar button.ql-insertTable svg,
+          .ql-snow .ql-toolbar button.ql-tableRow svg {
+            float: none;
+            display: block;
+            width: 18px;
+            height: 18px;
+          }
+          .ql-snow .ql-toolbar button.ql-customColor .toolbar-button-label,
+          .ql-snow .ql-toolbar button.ql-insertTable .toolbar-button-label,
+          .ql-snow .ql-toolbar button.ql-tableRow .toolbar-button-label {
+            color: #111827;
+          }
+          .ql-editor table {
+            width: 100%;
+            max-width: 100%;
+            margin: 16px 0;
+            border-collapse: collapse;
+            table-layout: fixed;
+          }
+          .ql-editor td,
+          .ql-editor th {
+            border: 1px solid ${EMAIL_TABLE_BORDER_COLOR};
+            padding: 10px 12px;
+            vertical-align: top;
+            word-break: break-word;
+          }
+          .ql-editor td p,
+          .ql-editor th p {
+            margin: 0;
           }
           ${fontStyleRules}
           ${sizeStyleRules}
@@ -265,11 +429,252 @@ const QuillEditor = ({ value, onChange }: QuillEditorProps) => {
         quillToolbarStylesInjected = true;
       }
 
-      const quillInstance = new Quill(containerRef.current, {
+      let quillInstance: any;
+
+      const ensureCustomColorInput = () => {
+        if (typeof document === "undefined") {
+          return null;
+        }
+        if (!customColorInputRef.current) {
+          const input = document.createElement("input");
+          input.type = "color";
+          input.style.position = "fixed";
+          input.style.left = "-10000px";
+          const handleColorChange = (event: Event) => {
+            const target = event.target as HTMLInputElement;
+            const nextColor = target.value || DEFAULT_TEXT_COLOR;
+
+            const selection = customColorSelectionRef.current;
+            if (selection) {
+              quillInstance.setSelection(selection);
+            }
+
+            quillInstance.focus();
+            quillInstance.format("color", nextColor);
+            enforceEditorContentStyles(quillInstance.root);
+            customColorSelectionRef.current = null;
+          };
+          customColorChangeHandlerRef.current = handleColorChange;
+          input.addEventListener("change", handleColorChange);
+          document.body.appendChild(input);
+          customColorInputRef.current = input;
+        }
+        return customColorInputRef.current;
+      };
+
+      const resolveHexColor = (color: unknown) => {
+        if (typeof color !== "string") {
+          return DEFAULT_TEXT_COLOR;
+        }
+        if (/^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(color)) {
+          return color;
+        }
+        const match = color.match(/^rgba?\(\s*(\d+),\s*(\d+),\s*(\d+)/i);
+        if (match) {
+          const [red, green, blue] = match
+            .slice(1, 4)
+            .map((component) =>
+              Math.min(255, Math.max(0, Number.parseInt(component, 10))),
+            );
+          const toHex = (value: number) => value.toString(16).padStart(2, "0");
+          return `#${toHex(red)}${toHex(green)}${toHex(blue)}`;
+        }
+        return DEFAULT_TEXT_COLOR;
+      };
+
+      const toolbarHandlers = {
+        customColor(this: { quill: any }) {
+          const quill = this.quill;
+          const selection =
+            quill.getSelection() ??
+            ({
+              index: quill.getLength(),
+              length: 0,
+            } as QuillRange);
+
+          customColorSelectionRef.current = {
+            index: selection.index,
+            length: selection.length,
+          };
+
+          const input = ensureCustomColorInput();
+          if (!input) {
+            return;
+          }
+
+          const format = quill.getFormat() as { color?: string };
+          const currentColor = resolveHexColor(format.color);
+
+          quill.focus();
+          input.value = currentColor;
+          input.click();
+        },
+        image(this: { quill: any }) {
+          const rawUrl = window.prompt("Paste the image URL");
+          if (!rawUrl) {
+            return;
+          }
+
+          const url = rawUrl.trim();
+          if (!/^https?:\/\/.+/i.test(url)) {
+            toast.error(
+              "Provide a valid image URL starting with http or https.",
+            );
+            return;
+          }
+
+          const quill = this.quill;
+          const selection = quill.getSelection();
+          const index = selection ? selection.index : quill.getLength();
+
+          quill.insertEmbed(index, "image", url, "user");
+          enforceEditorContentStyles(quill.root);
+          quill.setSelection(index + 1);
+        },
+        insertTable(this: { quill: any }) {
+          const quill = this.quill;
+          const tableModule = quill.getModule("better-table") as
+            | QuillTableModule
+            | undefined;
+
+          if (!tableModule) {
+            toast.error("Table support is not available right now.");
+            return;
+          }
+
+          quill.focus();
+          const currentRange = quill.getSelection(true);
+          if (currentRange) {
+            quill.setSelection(
+              currentRange.index,
+              currentRange.length,
+              "silent",
+            );
+          } else {
+            quill.setSelection(quill.getLength(), 0, "silent");
+          }
+
+          try {
+            const [table, , cell] = tableModule.getTable(quill.getSelection());
+            if (table && cell) {
+              const editorWrapper = quill.root.parentNode as HTMLElement | null;
+              if (!editorWrapper) {
+                toast.error("Unable to update the current table right now.");
+                return;
+              }
+
+              const compareRect = getRelativeRect(
+                cell.domNode.getBoundingClientRect(),
+                editorWrapper,
+              );
+              const affectedCells = table.insertRow(
+                compareRect,
+                true,
+                editorWrapper,
+              );
+
+              quill.update(Quill.sources.USER);
+
+              if (affectedCells?.[0]) {
+                quill.setSelection(
+                  quill.getIndex(affectedCells[0]),
+                  0,
+                  Quill.sources.SILENT,
+                );
+              }
+            } else {
+              tableModule.insertTable(
+                DEFAULT_TABLE_ROWS,
+                DEFAULT_TABLE_COLUMNS,
+              );
+            }
+          } catch (error) {
+            console.error("[email-template] insert table/row failed", error);
+            toast.error("Unable to add the table row. Please try again.");
+            return;
+          }
+
+          window.requestAnimationFrame(() => {
+            enforceEditorContentStyles(quill.root);
+          });
+        },
+        tableRow(this: { quill: any }) {
+          const quill = this.quill;
+          const tableModule = quill.getModule("better-table") as
+            | QuillTableModule
+            | undefined;
+
+          if (!tableModule) {
+            toast.error("Table support is not available right now.");
+            return;
+          }
+
+          const [table, , cell] = tableModule.getTable();
+          if (!table || !cell) {
+            toast.info("Place the cursor inside a table to add a row.");
+            return;
+          }
+
+          try {
+            const editorWrapper = quill.root.parentNode as HTMLElement | null;
+            if (!editorWrapper) {
+              toast.error("Unable to update the current table right now.");
+              return;
+            }
+
+            const compareRect = getRelativeRect(
+              cell.domNode.getBoundingClientRect(),
+              editorWrapper,
+            );
+            const affectedCells = table.insertRow(
+              compareRect,
+              true,
+              editorWrapper,
+            );
+
+            quill.update(Quill.sources.USER);
+
+            if (affectedCells?.[0]) {
+              quill.setSelection(
+                quill.getIndex(affectedCells[0]),
+                0,
+                Quill.sources.SILENT,
+              );
+            }
+          } catch (error) {
+            console.error("[email-template] insert row failed", error);
+            toast.error("Unable to add a table row. Please try again.");
+            return;
+          }
+
+          window.requestAnimationFrame(() => {
+            enforceEditorContentStyles(quill.root);
+          });
+        },
+      };
+
+      quillInstance = new Quill(containerRef.current, {
         theme: "snow",
         modules: {
-          toolbar: toolbarOptions
-        }
+          "better-table": {
+            operationMenu: {
+              items: {
+                unmergeCells: { text: "Unmerge cells" },
+              },
+              color: {
+                colors: ["#fff", "#e8e8e8", "#0e2f75"],
+                text: "Background Colors",
+              },
+            },
+          },
+          keyboard: {
+            bindings: QuillBetterTable.keyboardBindings,
+          },
+          toolbar: {
+            container: toolbarOptions,
+            handlers: toolbarHandlers,
+          },
+        },
       });
 
       quillRef.current = quillInstance;
@@ -290,10 +695,11 @@ const QuillEditor = ({ value, onChange }: QuillEditorProps) => {
 
       if (value) {
         quillInstance.clipboard.dangerouslyPasteHTML(value);
-        enforceImageSize(quillInstance.root);
+        enforceEditorContentStyles(quillInstance.root);
       }
 
       const handleChange = () => {
+        enforceEditorContentStyles(quillInstance.root);
         const html = quillInstance.root.innerHTML;
         onChange(normalizeHtml(html));
       };
@@ -310,125 +716,41 @@ const QuillEditor = ({ value, onChange }: QuillEditorProps) => {
         if (toolbarElement) {
           const customColorButton =
             toolbarElement.querySelector<HTMLButtonElement>(
-              "button.ql-customColor"
+              "button.ql-customColor",
             );
           if (customColorButton) {
             customColorButton.setAttribute("type", "button");
             customColorButton.setAttribute("title", "Custom text color");
             customColorButton.setAttribute("aria-label", "Custom text color");
+            customColorButton.innerHTML =
+              '<span class="toolbar-button-label">Clr</span>';
+          }
+
+          const insertTableButton =
+            toolbarElement.querySelector<HTMLButtonElement>(
+              "button.ql-insertTable",
+            );
+          if (insertTableButton) {
+            insertTableButton.setAttribute("type", "button");
+            insertTableButton.setAttribute("title", "Insert 2-column table");
+            insertTableButton.setAttribute(
+              "aria-label",
+              "Insert 2-column table",
+            );
+            insertTableButton.innerHTML = INSERT_TABLE_ICON;
+          }
+
+          const insertTableRowButton =
+            toolbarElement.querySelector<HTMLButtonElement>(
+              "button.ql-tableRow",
+            );
+          if (insertTableRowButton) {
+            insertTableRowButton.setAttribute("type", "button");
+            insertTableRowButton.setAttribute("title", "Add table row");
+            insertTableRowButton.setAttribute("aria-label", "Add table row");
+            insertTableRowButton.innerHTML = INSERT_ROW_ICON;
           }
         }
-
-        const ensureCustomColorInput = () => {
-          if (typeof document === "undefined") {
-            return null;
-          }
-          if (!customColorInputRef.current) {
-            const input = document.createElement("input");
-            input.type = "color";
-            input.style.position = "fixed";
-            input.style.left = "-10000px";
-            const handleColorChange = (event: Event) => {
-              const target = event.target as HTMLInputElement;
-              const nextColor = target.value || DEFAULT_TEXT_COLOR;
-
-              const selection = customColorSelectionRef.current;
-              if (selection) {
-                quillInstance.setSelection(selection);
-              }
-
-              quillInstance.focus();
-              quillInstance.format("color", nextColor);
-              customColorSelectionRef.current = null;
-            };
-            customColorChangeHandlerRef.current = handleColorChange;
-            input.addEventListener("change", handleColorChange);
-            document.body.appendChild(input);
-            customColorInputRef.current = input;
-          }
-          return customColorInputRef.current;
-        };
-
-        const resolveHexColor = (color: unknown) => {
-          if (typeof color !== "string") {
-            return DEFAULT_TEXT_COLOR;
-          }
-          if (/^#[0-9a-f]{3}(?:[0-9a-f]{3})?$/i.test(color)) {
-            return color;
-          }
-          const match = color.match(/^rgba?\(\s*(\d+),\s*(\d+),\s*(\d+)/i);
-          if (match) {
-            const [red, green, blue] = match
-              .slice(1, 4)
-              .map((component) =>
-                Math.min(255, Math.max(0, Number.parseInt(component, 10)))
-              );
-            const toHex = (value: number) =>
-              value.toString(16).padStart(2, "0");
-            return `#${toHex(red)}${toHex(green)}${toHex(blue)}`;
-          }
-          return DEFAULT_TEXT_COLOR;
-        };
-
-        toolbar.addHandler("customColor", () => {
-          const selection =
-            quillInstance.getSelection() ??
-            ({
-              index: quillInstance.getLength(),
-              length: 0
-            } as QuillRange);
-
-          customColorSelectionRef.current = {
-            index: selection.index,
-            length: selection.length
-          };
-
-          const input = ensureCustomColorInput();
-          if (!input) {
-            return;
-          }
-
-          const format = quillInstance.getFormat() as { color?: string };
-          const currentColor = resolveHexColor(format.color);
-
-          quillInstance.focus();
-          input.value = currentColor;
-          input.click();
-        });
-
-        toolbar.addHandler("image", () => {
-          const rawUrl = window.prompt("Paste the image URL");
-          if (!rawUrl) {
-            return;
-          }
-
-          const url = rawUrl.trim();
-          if (!/^https?:\/\/.+/i.test(url)) {
-            toast.error(
-              "Provide a valid image URL starting with http or https."
-            );
-            return;
-          }
-
-          const selection = quillInstance.getSelection();
-          const index = selection ? selection.index : quillInstance.getLength();
-
-          quillInstance.insertEmbed(index, "image", url, "user");
-          enforceImageSize(quillInstance.root);
-
-          const leaf = quillInstance.getLeaf(index);
-          if (leaf && leaf[0] && leaf[0].domNode instanceof HTMLImageElement) {
-            const img = leaf[0].domNode as HTMLImageElement;
-            img.width = 100;
-            img.height = 100;
-            img.style.width = "100px";
-            img.style.height = "100px";
-            img.style.objectFit = "contain";
-            img.style.display = "inline-block";
-          }
-
-          quillInstance.setSelection(index + 1);
-        });
       }
     };
 
@@ -442,7 +764,7 @@ const QuillEditor = ({ value, onChange }: QuillEditorProps) => {
       if (customColorInputRef.current && customColorChangeHandlerRef.current) {
         customColorInputRef.current.removeEventListener(
           "change",
-          customColorChangeHandlerRef.current
+          customColorChangeHandlerRef.current,
         );
       }
       if (customColorInputRef.current) {
@@ -464,14 +786,14 @@ const QuillEditor = ({ value, onChange }: QuillEditorProps) => {
     }
 
     const currentHtml = quill.root.innerHTML;
-    enforceImageSize(quill.root);
+    enforceEditorContentStyles(quill.root);
     const normalizedCurrent = normalizeHtml(currentHtml);
     const normalizedValue = normalizeHtml(value);
 
     if (normalizedValue !== normalizedCurrent) {
       const selection = quill.getSelection();
       quill.clipboard.dangerouslyPasteHTML(value || "");
-      enforceImageSize(quill.root);
+      enforceEditorContentStyles(quill.root);
       if (selection) {
         quill.setSelection(selection);
       }
@@ -488,11 +810,11 @@ type EmailTemplateManagerProps = {
 const createEmailTemplateInitialState: CreateEmailTemplateState = {
   success: false,
   error: undefined,
-  template: undefined
+  template: undefined,
 };
 
 const EmailTemplateManager = ({
-  initialTemplates
+  initialTemplates,
 }: EmailTemplateManagerProps) => {
   const formRef = useRef<HTMLFormElement | null>(null);
   const [templates, setTemplates] =
@@ -500,10 +822,10 @@ const EmailTemplateManager = ({
   const [templateName, setTemplateName] = useState("");
   const [subject, setSubject] = useState("");
   const [editingTemplateId, setEditingTemplateId] = useState<string | null>(
-    null
+    null,
   );
   const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(
-    null
+    null,
   );
   const [body, setBody] = useState("");
   const wasEditingOnSubmit = useRef(false);
@@ -526,7 +848,7 @@ const EmailTemplateManager = ({
       if (template) {
         setTemplates((prev) => [
           template,
-          ...prev.filter((tpl) => tpl.id !== template.id)
+          ...prev.filter((tpl) => tpl.id !== template.id),
         ]);
       }
 
@@ -538,7 +860,7 @@ const EmailTemplateManager = ({
       formRef.current?.reset();
       wasEditingOnSubmit.current = false;
       toast.success(
-        wasEditing ? "Email template updated" : "Email template saved"
+        wasEditing ? "Email template updated" : "Email template saved",
       );
     } else if (state.error) {
       toast.error(state.error);
@@ -548,7 +870,7 @@ const EmailTemplateManager = ({
   const latestTemplates = useMemo(() => {
     return [...templates].sort(
       (a, b) =>
-        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
     );
   }, [templates]);
 
@@ -598,7 +920,7 @@ const EmailTemplateManager = ({
 
     if (typeof window !== "undefined") {
       const confirmed = window.confirm(
-        "Delete this template permanently? This action cannot be undone."
+        "Delete this template permanently? This action cannot be undone.",
       );
       if (!confirmed) {
         return;
@@ -612,7 +934,7 @@ const EmailTemplateManager = ({
           if (!result.success) {
             toast.error(
               result.error ??
-                "Unable to delete email template. Try again later."
+                "Unable to delete email template. Try again later.",
             );
             return;
           }
@@ -643,11 +965,24 @@ const EmailTemplateManager = ({
   const renderTextPreview = (html: string) =>
     normalizeHtml(html)
       .replace(/<img[^>]*src=["']([^"']+)["'][^>]*>/gi, "[Image: $1]")
+      .replace(
+        /<a [^>]*href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gi,
+        (_match, href: string, text: string) => {
+          const label = text.replace(/<[^>]+>/g, "").trim();
+          if (!label) {
+            return href;
+          }
+          return label === href ? href : `${label} (${href})`;
+        },
+      )
+      .replace(/<\/t[dh]>\s*<t[dh][^>]*>/gi, " | ")
+      .replace(/<\/tr>/gi, "\n")
+      .replace(/<\/?(table|tbody|thead)>/gi, "\n")
       .replace(/<\/?(p|div|section|h[1-6])>/gi, "\n\n")
       .replace(/<li>\s*/gi, "- ")
       .replace(/<\/li>/gi, "\n")
       .replace(/<br\s*\/?>/gi, "\n")
-      .replace(/<\/ul>/gi, "\n")
+      .replace(/<\/(ul|ol)>/gi, "\n")
       .replace(/<[^>]+>/g, "")
       .replace(/\u00a0/g, " ")
       .replace(/\s+\n/g, "\n")
@@ -662,7 +997,7 @@ const EmailTemplateManager = ({
       day: "numeric",
       hour: "numeric",
       minute: "2-digit",
-      timeZone: "UTC"
+      timeZone: "UTC",
     }).format(new Date(value));
 
   return (
@@ -682,7 +1017,11 @@ const EmailTemplateManager = ({
             autoComplete="off"
           >
             {editingTemplateId ? (
-              <input type="hidden" name="templateId" value={editingTemplateId} />
+              <input
+                type="hidden"
+                name="templateId"
+                value={editingTemplateId}
+              />
             ) : null}
             <div className="grid gap-2">
               <Label htmlFor="templateName">Template name</Label>
@@ -725,8 +1064,9 @@ const EmailTemplateManager = ({
               )}
               <p className="text-xs text-slate-500">
                 Format your email using the editor. Inline styles are stored for
-                HTML emails, and a plain-text version is generated
-                automatically.
+                HTML emails, a plain-text version is generated automatically,
+                and links open in a new tab. Use the table button for a 2-column
+                row and `Row+` to add more rows.
               </p>
             </div>
 
@@ -814,7 +1154,8 @@ const EmailTemplateManager = ({
                         onClick={() => handleEditTemplate(template)}
                         disabled={
                           isPending ||
-                          (isDeletePending && deletingTemplateId === template.id)
+                          (isDeletePending &&
+                            deletingTemplateId === template.id)
                         }
                         aria-label="Edit template"
                       >
@@ -828,11 +1169,13 @@ const EmailTemplateManager = ({
                         onClick={() => handleDeleteTemplate(template.id)}
                         disabled={
                           isPending ||
-                          (isDeletePending && deletingTemplateId === template.id)
+                          (isDeletePending &&
+                            deletingTemplateId === template.id)
                         }
                         aria-label="Delete template"
                       >
-                        {isDeletePending && deletingTemplateId === template.id ? (
+                        {isDeletePending &&
+                        deletingTemplateId === template.id ? (
                           <Spinner className="text-rose-500" />
                         ) : (
                           <Trash2 className="size-4" />

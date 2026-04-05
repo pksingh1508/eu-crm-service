@@ -12,18 +12,18 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "CRM System - Professional Lead Management",
   description:
-    "A professional CRM system for managing leads and team collaboration"
+    "A professional CRM system for managing leads and team collaboration",
 };
 
 const RootLayout = async ({
-  children
+  children,
 }: Readonly<{
   children: React.ReactNode;
 }>) => {
   const supabase = await getSupabaseServerClient();
   const {
     data: { user },
-    error: userError
+    error: userError,
   } = await supabase.auth.getUser();
 
   let initialRole: "admin" | "team" | null = null;

@@ -58,11 +58,24 @@ const templateIdSchema = z
 
 const htmlToPlainText = (html: string): string =>
   html
+    .replace(
+      /<a [^>]*href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gi,
+      (_match, href: string, text: string) => {
+        const label = text.replace(/<[^>]+>/g, "").trim();
+        if (!label) {
+          return href;
+        }
+        return label === href ? href : `${label} (${href})`;
+      }
+    )
+    .replace(/<\/t[dh]>\s*<t[dh][^>]*>/gi, " | ")
+    .replace(/<\/tr>/gi, "\n")
+    .replace(/<\/?(table|tbody|thead)>/gi, "\n")
     .replace(/<\/?(p|div|section|h[1-6])>/gi, "\n\n")
     .replace(/<li>\s*/gi, "- ")
     .replace(/<\/li>/gi, "\n")
     .replace(/<br\s*\/?>/gi, "\n")
-    .replace(/<\/ul>/gi, "\n")
+    .replace(/<\/(ul|ol)>/gi, "\n")
     .replace(/<[^>]+>/g, "")
     .replace(/\u00a0/g, " ")
     .replace(/\s+\n/g, "\n")
