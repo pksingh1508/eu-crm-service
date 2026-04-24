@@ -9,7 +9,7 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue
+  SelectValue,
 } from "@/components/ui/select";
 import DataTable from "@/components/ui/data-table";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
@@ -23,7 +23,7 @@ type SearchParams = {
   page?: string;
 };
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 100;
 
 type TeamLeadResult = {
   leads: TeamLeadRow[];
@@ -49,7 +49,7 @@ const LEAD_SELECT =
 
 const fetchTeamLeads = async (
   searchParams: SearchParams,
-  userEmail: string | null
+  userEmail: string | null,
 ): Promise<TeamLeadResult> => {
   const supabaseAdmin = getSupabaseAdminClient();
   const query = searchParams.query?.trim() ?? "";
@@ -67,13 +67,13 @@ const fetchTeamLeads = async (
     : null;
 
   const applySearch = <T extends { or: (filters: string) => T }>(
-    leadsQuery: T
+    leadsQuery: T,
   ) => (searchConditions ? leadsQuery.or(searchConditions) : leadsQuery);
 
   const buildStatusQuery = (
     leadStatus: "new" | "email-send",
     pageFrom: number,
-    pageTo: number
+    pageTo: number,
   ) => {
     let leadsQuery = supabaseAdmin
       .from("leads")
@@ -94,18 +94,18 @@ const fetchTeamLeads = async (
   const fetchStatusPage = async (
     leadStatus: "new" | "email-send",
     pageFrom: number,
-    pageTo: number
+    pageTo: number,
   ) => {
     const { data, error, count } = await buildStatusQuery(
       leadStatus,
       pageFrom,
-      pageTo
+      pageTo,
     );
 
     return {
       leads: (data ?? []) as unknown as TeamLeadRow[],
       error,
-      count
+      count,
     };
   };
 
@@ -113,7 +113,7 @@ const fetchTeamLeads = async (
     const { leads, error, count } = await fetchStatusPage(
       normalizedStatus,
       from,
-      to
+      to,
     );
 
     if (error) {
@@ -124,7 +124,7 @@ const fetchTeamLeads = async (
         totalPages:
           count != null ? Math.max(1, Math.ceil(count / PAGE_SIZE)) : null,
         hasNext: false,
-        hasPrevious: page > 1
+        hasPrevious: page > 1,
       };
     }
 
@@ -138,13 +138,13 @@ const fetchTeamLeads = async (
       page,
       totalPages,
       hasNext,
-      hasPrevious: page > 1
+      hasPrevious: page > 1,
     };
   }
 
   const [newCountResult, sentCountResult] = await Promise.all([
     buildStatusQuery("new", 0, 0),
-    buildStatusQuery("email-send", 0, 0)
+    buildStatusQuery("email-send", 0, 0),
   ]);
   const newCount = newCountResult.count ?? 0;
   const sentCount = sentCountResult.count ?? 0;
@@ -158,9 +158,9 @@ const fetchTeamLeads = async (
       ? fetchStatusPage(
           "email-send",
           sentOffset,
-          sentOffset + (PAGE_SIZE - newRowsNeeded) - 1
+          sentOffset + (PAGE_SIZE - newRowsNeeded) - 1,
         )
-      : Promise.resolve({ leads: [], error: null, count: sentCount })
+      : Promise.resolve({ leads: [], error: null, count: sentCount }),
   ]);
 
   const error =
@@ -178,7 +178,7 @@ const fetchTeamLeads = async (
       totalPages:
         count != null ? Math.max(1, Math.ceil(count / PAGE_SIZE)) : null,
       hasNext: false,
-      hasPrevious: page > 1
+      hasPrevious: page > 1,
     };
   }
 
@@ -194,12 +194,12 @@ const fetchTeamLeads = async (
     page,
     totalPages,
     hasNext,
-    hasPrevious
+    hasPrevious,
   };
 };
 
 const TeamLeadsPage = async ({
-  searchParams
+  searchParams,
 }: {
   searchParams: Promise<SearchParams>;
 }) => {
@@ -207,7 +207,7 @@ const TeamLeadsPage = async ({
   const supabase = await getSupabaseServerClient();
   const {
     data: { user },
-    error: userError
+    error: userError,
   } = await supabase.auth.getUser();
 
   if (userError) {
@@ -223,7 +223,7 @@ const TeamLeadsPage = async ({
     page: currentPage,
     totalPages,
     hasNext,
-    hasPrevious
+    hasPrevious,
   } = await fetchTeamLeads(resolvedSearchParams, user.email ?? null);
 
   const buildPageLink = (page: number) => {
@@ -307,12 +307,12 @@ const TeamLeadsPage = async ({
                   {row.email ?? "—"}
                 </span>
               </div>
-            )
+            ),
           },
           {
             key: "phone",
             header: "Phone",
-            render: (row) => row.phone ?? "—"
+            render: (row) => row.phone ?? "—",
           },
           {
             key: "status",
@@ -321,12 +321,12 @@ const TeamLeadsPage = async ({
               <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700 capitalize">
                 {row.status}
               </span>
-            )
+            ),
           },
           {
             key: "send_by",
             header: "Sent By",
-            render: (row) => row.send_by ?? "—"
+            render: (row) => row.send_by ?? "—",
           },
           {
             key: "actions",
@@ -336,8 +336,8 @@ const TeamLeadsPage = async ({
               <Button asChild size="sm" variant="outline">
                 <Link href={buildLeadLink(row.id)}>Open</Link>
               </Button>
-            )
-          }
+            ),
+          },
         ]}
         data={leads}
         emptyMessage="No leads found. Update your filters or check back later."

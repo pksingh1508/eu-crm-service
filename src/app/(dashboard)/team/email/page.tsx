@@ -1,57 +1,57 @@
-﻿import { redirect } from "next/navigation"
+﻿import { redirect } from "next/navigation";
 
-import DataTable from "@/components/ui/data-table"
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { getSupabaseServerClient } from "@/lib/supabase/server"
-import { getSupabaseAdminClient } from "@/lib/supabase/admin"
+import DataTable from "@/components/ui/data-table";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type EmailEventRow = {
-  id: string
-  created_at: string
+  id: string;
+  created_at: string;
   lead: {
-    name: string | null
-    email: string | null
-  } | null
-  payload: Record<string, any> | null
-}
+    name: string | null;
+    email: string | null;
+  } | null;
+  payload: Record<string, any> | null;
+};
 
 type SearchParams = {
-  query?: string
-}
+  query?: string;
+};
 
 const EmailCenterPage = async ({
-  searchParams
+  searchParams,
 }: {
-  searchParams: Promise<SearchParams>
+  searchParams: Promise<SearchParams>;
 }) => {
-  const resolvedSearchParams = await searchParams
-  const supabase = await getSupabaseServerClient()
+  const resolvedSearchParams = await searchParams;
+  const supabase = await getSupabaseServerClient();
   const {
     data: { user },
-    error: userError
-  } = await supabase.auth.getUser()
+    error: userError,
+  } = await supabase.auth.getUser();
 
   if (userError) {
-    console.error("[email-center] failed to verify auth user", userError)
+    console.error("[email-center] failed to verify auth user", userError);
   }
 
   if (!user) {
-    redirect("/login")
+    redirect("/login");
   }
 
-  const supabaseAdmin = getSupabaseAdminClient()
+  const supabaseAdmin = getSupabaseAdminClient();
   const { data: eventsData } = await supabaseAdmin
     .from("lead_events")
     .select("id, created_at, payload, lead:lead_id(name,email)")
     .eq("event_type", "email_sent")
     .eq("actor_id", user.id)
     .order("created_at", { ascending: false })
-    .limit(100)
+    .limit(50);
 
-  const events = (eventsData ?? []) as unknown as EmailEventRow[]
+  const events = (eventsData ?? []) as unknown as EmailEventRow[];
 
-  const query = resolvedSearchParams.query?.trim().toLowerCase() ?? ""
+  const query = resolvedSearchParams.query?.trim().toLowerCase() ?? "";
   const filteredEvents =
     query.length === 0
       ? events
@@ -59,12 +59,10 @@ const EmailCenterPage = async ({
           const haystacks = [
             event.lead?.name ?? "",
             event.lead?.email ?? "",
-            event.payload?.subject ?? ""
-          ]
-          return haystacks.some((value) =>
-            value.toLowerCase().includes(query)
-          )
-        })
+            event.payload?.subject ?? "",
+          ];
+          return haystacks.some((value) => value.toLowerCase().includes(query));
+        });
 
   return (
     <div className="space-y-6">
@@ -104,7 +102,7 @@ const EmailCenterPage = async ({
           {
             key: "created_at",
             header: "Sent at",
-            render: (row) => new Date(row.created_at).toLocaleString()
+            render: (row) => new Date(row.created_at).toLocaleString(),
           },
           {
             key: "lead",
@@ -118,20 +116,20 @@ const EmailCenterPage = async ({
                   {row.lead?.email ?? "—"}
                 </span>
               </div>
-            )
+            ),
           },
           {
             key: "payload",
             header: "Subject",
-            render: (row) => row.payload?.subject ?? "—"
-          }
+            render: (row) => row.payload?.subject ?? "—",
+          },
         ]}
         data={filteredEvents}
         emptyMessage="No email activity yet."
         rowKey={(row) => row.id}
       />
     </div>
-  )
-}
+  );
+};
 
-export default EmailCenterPage
+export default EmailCenterPage;
