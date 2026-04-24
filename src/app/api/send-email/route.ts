@@ -197,7 +197,7 @@ export const POST = async (request: Request) => {
     // update the lead's status as email-sent
     const { error: leadUpdateError } = await supabaseAdmin
       .from("leads")
-      .update({ status: "email-send", send_by: payload.replyTo })
+      .update({ status: "email-send", send_by: user.email ?? payload.replyTo })
       .eq("id", lead.id);
 
     if (leadUpdateError) {

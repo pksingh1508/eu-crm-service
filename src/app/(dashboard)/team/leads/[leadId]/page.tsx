@@ -34,12 +34,38 @@ type LeadEventRow = {
   } | null;
 };
 
+type LeadDetailSearchParams = {
+  returnTo?: string;
+};
+
+const getLeadsReturnHref = (returnTo?: string) => {
+  if (!returnTo) {
+    return "/team/leads";
+  }
+
+  try {
+    const url = new URL(returnTo, "http://localhost");
+
+    if (url.origin !== "http://localhost" || url.pathname !== "/team/leads") {
+      return "/team/leads";
+    }
+
+    return `${url.pathname}${url.search}`;
+  } catch {
+    return "/team/leads";
+  }
+};
+
 const LeadDetailPage = async ({
-  params
+  params,
+  searchParams
 }: {
   params: Promise<{ leadId: string }>;
+  searchParams: Promise<LeadDetailSearchParams>;
 }) => {
   const resolvedParams = await params;
+  const resolvedSearchParams = await searchParams;
+  const leadsReturnHref = getLeadsReturnHref(resolvedSearchParams.returnTo);
   const supabase = await getSupabaseServerClient();
   const {
     data: { user },
@@ -121,7 +147,7 @@ const LeadDetailPage = async ({
     <div className="space-y-6">
       <div>
         <Button variant="ghost" size="sm" asChild className="-ml-2 px-2">
-          <Link href="/team/leads" className="flex items-center gap-2">
+          <Link href={leadsReturnHref} className="flex items-center gap-2">
             <ArrowLeft className="h-4 w-4" />
             Back to leads
           </Link>

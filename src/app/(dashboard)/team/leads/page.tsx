@@ -15,7 +15,7 @@ import DataTable from "@/components/ui/data-table";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
-const LEAD_STATUSES = ["new", "email sent"] as const;
+const LEAD_STATUSES = ["new", "email-send"] as const;
 
 type SearchParams = {
   status?: string;
@@ -23,7 +23,7 @@ type SearchParams = {
   page?: string;
 };
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 50;
 
 type TeamLeadResult = {
   leads: TeamLeadRow[];
@@ -44,8 +44,12 @@ type TeamLeadRow = {
   updated_at: string;
 };
 
+const LEAD_SELECT =
+  "id, name, email, phone, company, status, send_by, updated_at";
+
 const fetchTeamLeads = async (
-  searchParams: SearchParams
+  searchParams: SearchParams,
+  userEmail: string | null
 ): Promise<TeamLeadResult> => {
   const supabaseAdmin = getSupabaseAdminClient();
   const query = searchParams.query?.trim() ?? "";
@@ -55,26 +59,116 @@ const fetchTeamLeads = async (
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  let leadsQuery = supabaseAdmin
-    .from("leads")
-    .select("id, name, email, phone, company, status, send_by, updated_at", {
-      count: "exact"
-    })
-    .order("updated_at", { ascending: false })
-    .range(from, to);
+  const normalizedStatus =
+    status === "new" || status === "email-send" ? status : "all";
+  const like = query.length > 0 ? `%${query}%` : null;
+  const searchConditions = like
+    ? `name.ilike.${like},email.ilike.${like},company.ilike.${like}`
+    : null;
 
-  if (query.length > 0) {
-    const like = `%${query}%`;
-    leadsQuery = leadsQuery.or(
-      `name.ilike.${like},email.ilike.${like},company.ilike.${like}`
+  const applySearch = <T extends { or: (filters: string) => T }>(
+    leadsQuery: T
+  ) => (searchConditions ? leadsQuery.or(searchConditions) : leadsQuery);
+
+  const buildStatusQuery = (
+    leadStatus: "new" | "email-send",
+    pageFrom: number,
+    pageTo: number
+  ) => {
+    let leadsQuery = supabaseAdmin
+      .from("leads")
+      .select(LEAD_SELECT, { count: "exact" })
+      .eq("status", leadStatus)
+      .order("updated_at", { ascending: false })
+      .range(pageFrom, pageTo);
+
+    if (leadStatus === "email-send") {
+      leadsQuery = userEmail
+        ? leadsQuery.eq("send_by", userEmail)
+        : leadsQuery.is("id", null);
+    }
+
+    return applySearch(leadsQuery);
+  };
+
+  const fetchStatusPage = async (
+    leadStatus: "new" | "email-send",
+    pageFrom: number,
+    pageTo: number
+  ) => {
+    const { data, error, count } = await buildStatusQuery(
+      leadStatus,
+      pageFrom,
+      pageTo
     );
+
+    return {
+      leads: (data ?? []) as unknown as TeamLeadRow[],
+      error,
+      count
+    };
+  };
+
+  if (normalizedStatus !== "all") {
+    const { leads, error, count } = await fetchStatusPage(
+      normalizedStatus,
+      from,
+      to
+    );
+
+    if (error) {
+      console.error("[team-leads] failed to load leads", error);
+      return {
+        leads: [],
+        page,
+        totalPages:
+          count != null ? Math.max(1, Math.ceil(count / PAGE_SIZE)) : null,
+        hasNext: false,
+        hasPrevious: page > 1
+      };
+    }
+
+    const totalPages =
+      count != null ? Math.max(1, Math.ceil(count / PAGE_SIZE)) : null;
+    const hasNext =
+      totalPages != null ? page < totalPages : leads.length === PAGE_SIZE;
+
+    return {
+      leads,
+      page,
+      totalPages,
+      hasNext,
+      hasPrevious: page > 1
+    };
   }
 
-  if (status !== "all") {
-    leadsQuery = leadsQuery.eq("status", status);
-  }
+  const [newCountResult, sentCountResult] = await Promise.all([
+    buildStatusQuery("new", 0, 0),
+    buildStatusQuery("email-send", 0, 0)
+  ]);
+  const newCount = newCountResult.count ?? 0;
+  const sentCount = sentCountResult.count ?? 0;
+  const newRowsNeeded = Math.max(0, Math.min(PAGE_SIZE, newCount - from));
+  const sentOffset = Math.max(0, from - newCount);
+  const [newResult, sentResult] = await Promise.all([
+    newRowsNeeded > 0
+      ? fetchStatusPage("new", from, from + newRowsNeeded - 1)
+      : Promise.resolve({ leads: [], error: null, count: newCount }),
+    newRowsNeeded < PAGE_SIZE
+      ? fetchStatusPage(
+          "email-send",
+          sentOffset,
+          sentOffset + (PAGE_SIZE - newRowsNeeded) - 1
+        )
+      : Promise.resolve({ leads: [], error: null, count: sentCount })
+  ]);
 
-  const { data, error, count } = await leadsQuery;
+  const error =
+    newCountResult.error ??
+    sentCountResult.error ??
+    newResult.error ??
+    sentResult.error;
+  const count = newCount + sentCount;
 
   if (error) {
     console.error("[team-leads] failed to load leads", error);
@@ -88,7 +182,7 @@ const fetchTeamLeads = async (
     };
   }
 
-  const leads = (data ?? []) as unknown as TeamLeadRow[];
+  const leads = [...newResult.leads, ...sentResult.leads];
   const totalPages =
     count != null ? Math.max(1, Math.ceil(count / PAGE_SIZE)) : null;
   const hasNext =
@@ -130,7 +224,7 @@ const TeamLeadsPage = async ({
     totalPages,
     hasNext,
     hasPrevious
-  } = await fetchTeamLeads(resolvedSearchParams);
+  } = await fetchTeamLeads(resolvedSearchParams, user.email ?? null);
 
   const buildPageLink = (page: number) => {
     const params = new URLSearchParams();
@@ -146,6 +240,9 @@ const TeamLeadsPage = async ({
     const queryString = params.toString();
     return queryString ? `/team/leads?${queryString}` : "/team/leads";
   };
+  const currentListLink = buildPageLink(currentPage);
+  const buildLeadLink = (leadId: string) =>
+    `/team/leads/${leadId}?returnTo=${encodeURIComponent(currentListLink)}`;
 
   return (
     <div className="space-y-6">
@@ -237,7 +334,7 @@ const TeamLeadsPage = async ({
             className: "text-right",
             render: (row) => (
               <Button asChild size="sm" variant="outline">
-                <Link href={`/team/leads/${row.id}`}>Open</Link>
+                <Link href={buildLeadLink(row.id)}>Open</Link>
               </Button>
             )
           }
