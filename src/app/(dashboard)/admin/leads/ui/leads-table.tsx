@@ -2,6 +2,7 @@ import { Inbox, SearchX } from "lucide-react"
 import { Fragment } from "react"
 
 import LeadStatusBadge from "@/components/leads/lead-status-badge"
+import ClearFiltersButton from "@/components/list/clear-filters-button"
 import EmptyState from "@/components/ui/empty-state"
 import InitialsAvatar from "@/components/ui/initials-avatar"
 import RelativeTime from "@/components/ui/relative-time"
@@ -9,8 +10,6 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { getLeadStatusLabel, type LeadStatusFilter } from "@/lib/leads"
 import { cn, formatNumber } from "@/lib/utils"
 import type { LeadListItem } from "@/server/leads/queries"
-
-import ClearFiltersButton from "./clear-filters-button"
 
 // On narrow screens only the Lead column shows, with the status and date
 // inside it; the other columns appear as the content area gets wider.

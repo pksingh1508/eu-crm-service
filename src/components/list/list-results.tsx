@@ -2,17 +2,23 @@
 
 import { cn } from "@/lib/utils"
 
-import { useLeadsNavigation } from "./leads-navigation"
+import { useUrlState } from "./url-state"
 
-// The card around the table. While the next rows load, the current ones dim
-// and a thin bar runs along the top (only if it takes more than a moment).
-const LeadsResults = ({ children }: { children: React.ReactNode }) => {
-  const { isPending, resultsRef } = useLeadsNavigation()
+// The card around a list. While the next rows load, the current ones dim and
+// a thin bar runs along the top (only if it takes more than a moment).
+const ListResults = ({
+  label,
+  children
+}: {
+  label: string
+  children: React.ReactNode
+}) => {
+  const { isPending, resultsRef } = useUrlState()
 
   return (
     <section
       ref={resultsRef}
-      aria-label="Leads"
+      aria-label={label}
       aria-busy={isPending}
       className="relative scroll-mt-20 overflow-hidden rounded-xl border bg-card text-card-foreground shadow-xs"
     >
@@ -37,4 +43,4 @@ const LeadsResults = ({ children }: { children: React.ReactNode }) => {
   )
 }
 
-export default LeadsResults
+export default ListResults

@@ -10,10 +10,10 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select"
-import { buildLeadsHref, LEADS_PAGE_SIZES } from "@/lib/leads"
+import { PAGE_SIZES } from "@/lib/list-params"
 import { cn, formatNumber } from "@/lib/utils"
 
-import { useLeadsNavigation } from "./leads-navigation"
+import { useUrlState } from "./url-state"
 
 // Always 7 slots: first, last, the current page with its neighbours, and "…"
 // for the gaps, e.g. 1 … 4 5 6 … 407
@@ -86,42 +86,36 @@ const PageLink = ({
   )
 }
 
-const LeadsPagination = ({
+// Footer of a list: "Showing 51–100 of 20,505", rows per page and page links.
+// Uses the `page` and `pageSize` URL params.
+const ListPagination = ({
   total,
   pageCount
 }: {
   total: number
   pageCount: number
 }) => {
-  const { params, committedParams, navigate, resultsRef } =
-    useLeadsNavigation()
+  const { params, committedParams, navigate, hrefFor } = useUrlState<{
+    page: number
+    pageSize: number
+  }>()
   const { page, pageSize } = params
 
-  const goToPage = (target: number) => {
-    // From the bottom of a long page, bring the top of the list back into view
-    const results = resultsRef.current
-    if (results && results.getBoundingClientRect().top < 0) {
-      results.scrollIntoView({ behavior: "smooth", block: "start" })
-    }
-
-    navigate({ page: target })
-  }
-
   const linkTo = (target: number) => ({
-    href: buildLeadsHref({ ...params, page: target }),
+    href: hrefFor({ page: target }),
     isDisabled: target < 1 || target > pageCount,
-    onSelect: () => goToPage(target)
+    onSelect: () => navigate({ page: target }, { scrollToResults: true })
   })
 
-  const first = (committedParams.page - 1) * committedParams.pageSize + 1
-  const last = Math.min(total, committedParams.page * committedParams.pageSize)
+  const firstRow = (committedParams.page - 1) * committedParams.pageSize
 
   return (
     <div className="flex flex-col gap-3 border-t px-5 py-3 @2xl:flex-row @2xl:items-center @2xl:justify-between">
       <p className="text-sm text-muted-foreground" aria-live="polite">
         Showing{" "}
         <span className="font-medium tabular-nums text-foreground">
-          {formatNumber(first)}–{formatNumber(last)}
+          {formatNumber(firstRow + 1)}–
+          {formatNumber(Math.min(total, firstRow + committedParams.pageSize))}
         </span>{" "}
         of{" "}
         <span className="font-medium tabular-nums text-foreground">
@@ -137,8 +131,6 @@ const LeadsPagination = ({
             onValueChange={(value) => {
               const size = Number(value)
               // Keep the first row that was on screen on the new page
-              const firstRow =
-                (committedParams.page - 1) * committedParams.pageSize
               navigate({ pageSize: size, page: Math.floor(firstRow / size) + 1 })
             }}
           >
@@ -149,7 +141,7 @@ const LeadsPagination = ({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {LEADS_PAGE_SIZES.map((size) => (
+              {PAGE_SIZES.map((size) => (
                 <SelectItem key={size} value={String(size)}>
                   {size}
                 </SelectItem>
@@ -196,4 +188,4 @@ const LeadsPagination = ({
   )
 }
 
-export default LeadsPagination
+export default ListPagination

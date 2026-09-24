@@ -1,13 +1,18 @@
 import { redirect } from "next/navigation"
 
-import { buildLeadsHref, parseLeadsSearchParams } from "@/lib/leads"
+import ListPagination from "@/components/list/list-pagination"
+import ListResults from "@/components/list/list-results"
+import ListSearch from "@/components/list/list-search"
+import { UrlStateProvider } from "@/components/list/url-state"
+import {
+  buildLeadsHref,
+  LEADS_DEFAULTS,
+  LEADS_PATH,
+  parseLeadsSearchParams
+} from "@/lib/leads"
 import { getLeadsPage } from "@/server/leads/queries"
 
 import LeadsHeader from "./ui/leads-header"
-import { LeadsNavigationProvider } from "./ui/leads-navigation"
-import LeadsPagination from "./ui/leads-pagination"
-import LeadsResults from "./ui/leads-results"
-import LeadsSearch from "./ui/leads-search"
 import LeadsTable from "./ui/leads-table"
 import StatusFilter from "./ui/status-filter"
 
@@ -26,16 +31,24 @@ const AdminLeadsPage = async ({
   }
 
   return (
-    <LeadsNavigationProvider params={params}>
+    <UrlStateProvider
+      pathname={LEADS_PATH}
+      params={params}
+      defaults={LEADS_DEFAULTS}
+    >
       <div className="@container space-y-6">
         <LeadsHeader />
 
         <div className="flex flex-col gap-3 @3xl:flex-row @3xl:items-center @3xl:justify-between">
-          <LeadsSearch />
+          <ListSearch
+            placeholder="Name, email, phone or company"
+            label="Search leads"
+            className="@3xl:max-w-sm"
+          />
           <StatusFilter counts={statusCounts} />
         </div>
 
-        <LeadsResults>
+        <ListResults label="Leads">
           <LeadsTable
             leads={leads}
             resultKey={buildLeadsHref(params)}
@@ -44,11 +57,11 @@ const AdminLeadsPage = async ({
             hasFilters={params.query !== "" || params.status !== "all"}
           />
           {total > 0 ? (
-            <LeadsPagination total={total} pageCount={pageCount} />
+            <ListPagination total={total} pageCount={pageCount} />
           ) : null}
-        </LeadsResults>
+        </ListResults>
       </div>
-    </LeadsNavigationProvider>
+    </UrlStateProvider>
   )
 }
 

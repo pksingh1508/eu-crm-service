@@ -1,5 +1,6 @@
 import type { LeadsSearchParams } from "@/lib/leads"
 import { getSupabaseAdminClient } from "@/lib/supabase/admin"
+import { containsAny } from "@/server/lib/postgrest"
 
 export type LeadListItem = {
   id: string
@@ -19,21 +20,12 @@ const LEAD_COLUMNS = "id, name, email, phone, status, send_by, created_at"
 const STATUS_GROUPS = ["new", "email-send", "other"] as const
 type StatusGroup = (typeof STATUS_GROUPS)[number]
 
-// Values in a PostgREST `or` filter can't contain , . : ( ) unless quoted.
-// LIKE wildcards are escaped first, so "50%" or "a_b" match literally.
-const toSearchFilter = (query: string) => {
-  const pattern = `%${query.replace(/[\\%_]/g, "\\$&")}%`
-  const quoted = `"${pattern.replace(/["\\]/g, "\\$&")}"`
-
-  return ["name", "email", "phone", "company"]
-    .map((column) => `${column}.ilike.${quoted}`)
-    .join(",")
-}
-
 // Supabase returns plain error objects; real errors keep the message and a
 // stack trace in the server logs
 const toError = (error: { message: string }) =>
-  new Error(`Failed to load leads: ${error.message}`, { cause: error })
+  new Error(`Failed to load leads: ${error.message || "request failed"}`, {
+    cause: error
+  })
 
 const selectGroup = (
   supabase: ReturnType<typeof getSupabaseAdminClient>,
@@ -50,7 +42,9 @@ const selectGroup = (
       ? builder.not("status", "in", "(new,email-send)")
       : builder.eq("status", group)
 
-  return query ? inGroup.or(toSearchFilter(query)) : inGroup
+  return query
+    ? inGroup.or(containsAny(["name", "email", "phone", "company"], query))
+    : inGroup
 }
 
 export const getLeadsPage = async ({
