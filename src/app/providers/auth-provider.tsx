@@ -1,8 +1,12 @@
 "use client"
 
-import { PropsWithChildren, useEffect } from "react"
+import { PropsWithChildren, useEffect, useState } from "react"
 
-import { useAuthStore, type UserRole } from "@/stores/auth-store"
+import {
+  AuthStoreContext,
+  createAuthStore,
+  type UserRole
+} from "@/stores/auth-store"
 
 type AuthProviderProps = PropsWithChildren<{
   initialUser: { id: string; email: string | null } | null
@@ -16,18 +20,24 @@ const AuthProvider = ({
   initialWorkspaceEmailId,
   children
 }: AuthProviderProps) => {
-  const setAuthState = useAuthStore((state) => state.setAuthState)
-
-  useEffect(() => {
-    setAuthState({
+  const [store] = useState(() =>
+    createAuthStore({
       user: initialUser,
       role: initialRole,
       workspaceEmailId: initialWorkspaceEmailId
     })
-  }, [initialUser, initialRole, initialWorkspaceEmailId, setAuthState])
+  )
 
-  return <>{children}</>
+  // Picks up a new session from the server, e.g. after signing in or out
+  useEffect(() => {
+    store.getState().setAuthState({
+      user: initialUser,
+      role: initialRole,
+      workspaceEmailId: initialWorkspaceEmailId
+    })
+  }, [initialUser, initialRole, initialWorkspaceEmailId, store])
+
+  return <AuthStoreContext value={store}>{children}</AuthStoreContext>
 }
 
 export default AuthProvider
-

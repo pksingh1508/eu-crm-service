@@ -1,8 +1,12 @@
 import { Mail, Users2, Inbox } from "lucide-react";
 
 import StatCard from "@/components/ui/stat-card";
-import DataTable from "@/components/ui/data-table";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import { cn } from "@/lib/utils";
+
+import DashboardHeader from "./ui/dashboard-header";
+import { RECENT_LEADS_LIMIT, RecentLeads } from "./ui/recent-leads";
+import { TeamActivity } from "./ui/team-activity";
 
 type EmailEventRow = {
   id: string;
@@ -56,7 +60,7 @@ const getMetrics = async () => {
       .from("leads")
       .select("id, name, email, status, created_at")
       .order("created_at", { ascending: false })
-      .limit(8),
+      .limit(RECENT_LEADS_LIMIT),
     supabaseAdmin
       .from("profiles")
       .select("id, full_name, email", { count: "exact" })
@@ -132,35 +136,35 @@ const AdminDashboardPage = async () => {
       title: "Total Leads",
       value: metrics.totalLeads.toLocaleString(),
       subtitle: "All-time captured leads",
-      icon: <Inbox className="h-5 w-5" />,
+      icon: <Inbox />,
       trend: {
         direction:
           metrics.leadsThisWeek > 0 ? ("up" as const) : ("neutral" as const),
         value:
           metrics.leadsThisWeek > 0
-            ? `${metrics.leadsThisWeek} added last 7 days`
-            : "No new leads last 7 days"
+            ? `${metrics.leadsThisWeek.toLocaleString()} added in the last 7 days`
+            : "No new leads in the last 7 days"
       }
     },
     {
       title: "Emails Sent",
       value: metrics.totalEmailEvents.toLocaleString(),
       subtitle: "All-time outbound emails",
-      icon: <Mail className="h-5 w-5" />,
+      icon: <Mail />,
       trend: {
         direction:
           metrics.emailsThisWeek > 0 ? ("up" as const) : ("neutral" as const),
         value:
           metrics.emailsThisWeek > 0
-            ? `${metrics.emailsThisWeek} in last 7 days`
-            : "No emails last 7 days"
+            ? `${metrics.emailsThisWeek.toLocaleString()} sent in the last 7 days`
+            : "No emails in the last 7 days"
       }
     },
     {
       title: "Active Senders",
       value: metrics.teamMembersCount.toLocaleString(),
       subtitle: "Team members with sender access",
-      icon: <Users2 className="h-5 w-5" />,
+      icon: <Users2 />,
       trend: {
         direction:
           metrics.emailsPerMember.length > 0
@@ -168,93 +172,43 @@ const AdminDashboardPage = async () => {
             : ("neutral" as const),
         value:
           metrics.emailsPerMember.length > 0
-            ? `${metrics.emailsPerMember.length} sent last 7 days`
+            ? `${metrics.emailsPerMember.length} sent emails in the last 7 days`
             : "No recent senders"
       }
     }
   ];
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-semibold text-slate-900">
-          Admin Dashboard
-        </h1>
-        <p className="mt-2 text-sm text-slate-600">
-          Monitor lead intake and outbound email performance across your team.
-        </p>
-      </div>
+    // Column counts follow the width of the content area (a container query),
+    // so they account for the sidebar
+    <div className="@container space-y-6 md:space-y-8">
+      <DashboardHeader />
 
-      <section className="grid gap-6 md:grid-cols-3">
-        {statCards.map((card) => (
-          <StatCard key={card.title} {...card} />
+      <section
+        aria-label="Key metrics"
+        className="grid gap-4 md:gap-6 @xl:grid-cols-2 @4xl:grid-cols-3"
+      >
+        {statCards.map((card, index) => (
+          <StatCard
+            key={card.title}
+            {...card}
+            className={cn(
+              "motion-safe:animate-fade-in-up",
+              // On two columns, the last card takes the full row
+              index === statCards.length - 1 && "@xl:col-span-2 @4xl:col-span-1"
+            )}
+            style={{ animationDelay: `${index * 70}ms` }}
+          />
         ))}
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-2">
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-slate-900">
-            Emails sent per member (7d)
-          </h2>
-          <DataTable
-            columns={[
-              {
-                key: "name",
-                header: "Team member"
-              },
-              {
-                key: "email",
-                header: "Email"
-              },
-              {
-                key: "count",
-                header: "Emails sent",
-                className: "text-right",
-                render: (row) => (
-                  <span className="font-semibold text-slate-900">
-                    {row.count}
-                  </span>
-                )
-              }
-            ]}
-            data={metrics.emailsPerMember}
-            emptyMessage="No email activity recorded in the last 7 days."
-          />
-        </div>
-
-        <div className="space-y-4">
-          <h2 className="text-lg font-semibold text-slate-900">Recent leads</h2>
-          <DataTable
-            columns={[
-              {
-                key: "name",
-                header: "Lead"
-              },
-              {
-                key: "email",
-                header: "Email"
-              },
-              {
-                key: "status",
-                header: "Status",
-                render: (row) => (
-                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700 capitalize">
-                    {row.status}
-                  </span>
-                )
-              },
-              {
-                key: "created_at",
-                header: "Created",
-                render: (row) => new Date(row.created_at).toLocaleDateString()
-              }
-            ]}
-            data={metrics.latestLeads}
-            emptyMessage="No leads captured yet."
-            rowKey={(row) => row.id}
-          />
-        </div>
-      </section>
+      <div className="grid gap-4 md:gap-6 @4xl:grid-cols-5">
+        <TeamActivity
+          members={metrics.emailsPerMember}
+          className="@4xl:col-span-2"
+        />
+        <RecentLeads leads={metrics.latestLeads} className="@4xl:col-span-3" />
+      </div>
     </div>
   );
 };
