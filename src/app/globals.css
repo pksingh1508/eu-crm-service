@@ -47,9 +47,17 @@
 @theme {
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 
+  --animate-fade-in: fade-in 0.3s ease-out backwards;
   --animate-fade-in-up: fade-in-up 0.5s var(--ease-out-expo) backwards;
   --animate-grow-x: grow-x 0.9s var(--ease-out-expo) backwards;
   --animate-shimmer: shimmer 1.6s ease-in-out infinite;
+  --animate-progress: progress 1.1s ease-in-out infinite;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
 
   @keyframes fade-in-up {
     from {
@@ -70,6 +78,16 @@
     }
     to {
       translate: 100% 0;
+    }
+  }
+
+  /* An indeterminate bar, a third as wide as its track */
+  @keyframes progress {
+    from {
+      translate: -100% 0;
+    }
+    to {
+      translate: 300% 0;
     }
   }
 }

@@ -1,19 +1,11 @@
+import { getLeadStatusLabel } from "@/lib/leads"
 import { cn } from "@/lib/utils"
-
-const statusLabels: Record<string, string> = {
-  new: "New",
-  "email-send": "Email sent"
-}
-
-const toLabel = (status: string) =>
-  statusLabels[status] ??
-  status.charAt(0).toUpperCase() + status.slice(1).replace(/[-_]/g, " ")
 
 const LeadStatusBadge = ({
   status,
   className
 }: {
-  status: string
+  status: string | null
   className?: string
 }) => {
   const isNew = status === "new"
@@ -35,7 +27,7 @@ const LeadStatusBadge = ({
           isNew ? "bg-primary-foreground" : "bg-foreground/40"
         )}
       />
-      {toLabel(status)}
+      {getLeadStatusLabel(status)}
     </span>
   )
 }

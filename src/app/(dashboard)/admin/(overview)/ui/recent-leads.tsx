@@ -1,14 +1,14 @@
-import { formatDistanceToNowStrict } from "date-fns"
 import { Inbox } from "lucide-react"
 
 import LeadStatusBadge from "@/components/leads/lead-status-badge"
+import EmptyState from "@/components/ui/empty-state"
+import InitialsAvatar from "@/components/ui/initials-avatar"
+import RelativeTime from "@/components/ui/relative-time"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 
 import {
   DashboardPanel,
-  EmptyState,
-  InitialsAvatar,
   panelRowClassName,
   panelRowHoverClassName
 } from "./dashboard-panel"
@@ -63,14 +63,10 @@ export const RecentLeads = ({
               </div>
               <div className="flex shrink-0 flex-col items-end gap-1">
                 <LeadStatusBadge status={lead.status} />
-                <time
-                  dateTime={lead.created_at}
+                <RelativeTime
+                  date={lead.created_at}
                   className="text-xs text-muted-foreground"
-                >
-                  {formatDistanceToNowStrict(new Date(lead.created_at), {
-                    addSuffix: true
-                  })}
-                </time>
+                />
               </div>
             </li>
           ))}

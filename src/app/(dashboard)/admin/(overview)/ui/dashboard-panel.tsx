@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ArrowRight, type LucideIcon } from "lucide-react"
+import { ArrowRight } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -53,41 +53,3 @@ export const panelRowClassName = "flex items-center gap-3 px-5 py-3.5"
 // For rows with real data (not skeletons)
 export const panelRowHoverClassName =
   "transition-colors duration-150 hover:bg-muted/40"
-
-export const EmptyState = ({
-  icon: Icon,
-  title,
-  description
-}: {
-  icon: LucideIcon
-  title: string
-  description: string
-}) => (
-  <div className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
-    <div className="flex size-11 items-center justify-center rounded-full border bg-muted/60">
-      <Icon className="size-5 text-muted-foreground" />
-    </div>
-    <div className="space-y-1">
-      <p className="text-sm font-medium">{title}</p>
-      <p className="text-sm text-muted-foreground">{description}</p>
-    </div>
-  </div>
-)
-
-const getInitials = (name: string) =>
-  name
-    .split("@")[0]
-    .split(/[\s._-]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part.charAt(0).toUpperCase())
-    .join("") || "?"
-
-export const InitialsAvatar = ({ name }: { name: string }) => (
-  <span
-    aria-hidden="true"
-    className="flex size-8 shrink-0 items-center justify-center rounded-full border bg-muted/60 text-[11px] font-semibold text-foreground/80"
-  >
-    {getInitials(name)}
-  </span>
-)
