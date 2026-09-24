@@ -1,15 +1,14 @@
 import { Mail } from "lucide-react"
 
-import EmptyState from "@/components/ui/empty-state"
-import InitialsAvatar from "@/components/ui/initials-avatar"
-import { Skeleton } from "@/components/ui/skeleton"
-import { cn } from "@/lib/utils"
-
 import {
   DashboardPanel,
   panelRowClassName,
   panelRowHoverClassName
-} from "./dashboard-panel"
+} from "@/components/dashboard/dashboard-panel"
+import EmptyState from "@/components/ui/empty-state"
+import InitialsAvatar from "@/components/ui/initials-avatar"
+import { Skeleton } from "@/components/ui/skeleton"
+import { cn } from "@/lib/utils"
 
 type MemberActivity = {
   actorId: string

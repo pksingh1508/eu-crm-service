@@ -1,17 +1,16 @@
 import { Inbox } from "lucide-react"
 
+import {
+  DashboardPanel,
+  panelRowClassName,
+  panelRowHoverClassName
+} from "@/components/dashboard/dashboard-panel"
 import LeadStatusBadge from "@/components/leads/lead-status-badge"
 import EmptyState from "@/components/ui/empty-state"
 import InitialsAvatar from "@/components/ui/initials-avatar"
 import RelativeTime from "@/components/ui/relative-time"
 import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
-
-import {
-  DashboardPanel,
-  panelRowClassName,
-  panelRowHoverClassName
-} from "./dashboard-panel"
 
 type LeadRow = {
   id: string
