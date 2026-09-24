@@ -127,7 +127,11 @@ export const POST = async (request: Request) => {
     phone: payload.phone ?? null,
     notes: payload.notes ?? null,
     message: payload.message ?? null,
-    status: payload.status ?? undefined,
+    // Only a new lead takes its status from the request. When a lead is sent
+    // again (e.g. the person fills in the form a second time), it keeps its
+    // current status, so a lead that was already emailed doesn't go back to
+    // "new" while still showing who emailed it.
+    status: existingLeadId ? undefined : payload.status ?? undefined,
     source: payload.source ?? null,
     assigned_to: payload.assignedTo ?? null
   };
