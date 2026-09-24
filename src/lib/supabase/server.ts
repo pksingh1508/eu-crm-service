@@ -4,9 +4,21 @@ import { cookies } from "next/headers"
 import { createServerClient } from "@supabase/ssr"
 
 import { env } from "../env"
+import {
+  LOGIN_SESSION_COOKIE,
+  capToLoginSession,
+  readLoginSession
+} from "../login-session"
 
-export const getSupabaseServerClient = async () => {
+// Only pass `loginSessionExpiresAt` while signing in, before the login session
+// cookie exists; otherwise the expiry is read from that cookie.
+export const getSupabaseServerClient = async (
+  loginSessionExpiresAt?: number
+) => {
   const cookieStore = await cookies()
+  const sessionExpiresAt =
+    loginSessionExpiresAt ??
+    readLoginSession(cookieStore.get(LOGIN_SESSION_COOKIE)?.value)?.expiresAt
 
   return createServerClient(
     env.NEXT_PUBLIC_SUPABASE_URL,
@@ -18,7 +30,11 @@ export const getSupabaseServerClient = async () => {
         },
         set(name: string, value: string, options: any) {
           try {
-            cookieStore.set({ name, value, ...(options ?? {}) })
+            cookieStore.set({
+              name,
+              value,
+              ...capToLoginSession(options ?? {}, sessionExpiresAt)
+            })
           } catch (error) {
             if (
               error instanceof Error &&

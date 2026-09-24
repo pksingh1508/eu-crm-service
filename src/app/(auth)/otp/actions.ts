@@ -3,6 +3,10 @@
 import { cookies } from "next/headers"
 import { z } from "zod"
 
+import {
+  createLoginSessionCookie,
+  getLoginSessionExpiry
+} from "@/lib/login-session"
 import { hashOtp } from "@/lib/otp"
 import { getSupabaseAdminClient } from "@/lib/supabase/admin"
 import { getSupabaseServerClient } from "@/lib/supabase/server"
@@ -111,7 +115,8 @@ export const verifyOtpAction = async (
     }
   }
 
-  const supabase = await getSupabaseServerClient()
+  const loginSessionExpiresAt = getLoginSessionExpiry()
+  const supabase = await getSupabaseServerClient(loginSessionExpiresAt)
   const { error: setSessionError } = await supabase.auth.setSession({
     access_token: pendingSession.access_token,
     refresh_token: pendingSession.refresh_token
@@ -127,15 +132,13 @@ export const verifyOtpAction = async (
 
   cookieStore.delete("pending_session")
 
-  cookieStore.set({
-    name: "otp_verified",
-    value: "true",
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 24 * 60 * 60,
-    path: "/"
-  })
+  // Keeps the user signed in for the next 2 days, even across browser restarts
+  cookieStore.set(
+    createLoginSessionCookie({
+      userId: pendingSession.user_id,
+      expiresAt: loginSessionExpiresAt
+    })
+  )
 
   return { success: true }
 }
