@@ -8,14 +8,18 @@ import {
   useState,
   useTransition,
 } from "react";
-import { Pencil, Trash2 } from "lucide-react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { Eye, FileText, Pencil, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import EmptyState from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import SegmentedControl from "@/components/ui/segmented-control";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
+import { cn } from "@/lib/utils";
 import {
   CreateEmailTemplateState,
   EmailTemplateSummary,
@@ -25,6 +29,7 @@ import {
 
 import "quill/dist/quill.snow.css";
 import "quill-better-table/dist/quill-better-table.css";
+import "./email-editor.css";
 
 type QuillEditorProps = {
   value: string;
@@ -803,6 +808,29 @@ const QuillEditor = ({ value, onChange }: QuillEditorProps) => {
   return <div ref={containerRef} className="min-h-[360px]" />;
 };
 
+// Placeholder in the shape of the editor, shown until Quill is ready
+const EditorSkeleton = ({ className }: { className?: string }) => (
+  <div
+    aria-hidden="true"
+    className={cn("overflow-hidden rounded-md border bg-background", className)}
+  >
+    <div className="flex flex-wrap items-center gap-1.5 border-b bg-muted/40 p-2">
+      <Skeleton className="h-6 w-24" />
+      <Skeleton className="h-6 w-16" />
+      <Skeleton className="h-6 w-20" />
+      {Array.from({ length: 9 }, (_, index) => (
+        <Skeleton key={index} className="size-6" />
+      ))}
+    </div>
+    <div className="space-y-3 p-5" style={{ height: EDITOR_SCROLL_HEIGHT }}>
+      <Skeleton className="h-3.5 w-2/3" />
+      <Skeleton className="h-3.5 w-11/12" />
+      <Skeleton className="h-3.5 w-4/5" />
+      <Skeleton className="h-3.5 w-1/2" />
+    </div>
+  </div>
+);
+
 type EmailTemplateManagerProps = {
   initialTemplates: EmailTemplateSummary[];
 };
@@ -817,6 +845,7 @@ const EmailTemplateManager = ({
   initialTemplates,
 }: EmailTemplateManagerProps) => {
   const formRef = useRef<HTMLFormElement | null>(null);
+  const editorCardRef = useRef<HTMLElement | null>(null);
   const [templates, setTemplates] =
     useState<EmailTemplateSummary[]>(initialTemplates);
   const [templateName, setTemplateName] = useState("");
@@ -1000,29 +1029,56 @@ const EmailTemplateManager = ({
       timeZone: "UTC",
     }).format(new Date(value));
 
+  // On narrow screens the form sits above the list; bring it into view when a
+  // template is opened for editing further down the page
+  const revealEditor = () => {
+    const card = editorCardRef.current;
+    if (card && card.getBoundingClientRect().top < 0) {
+      card.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
-      <Card className="border-slate-200 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-lg text-slate-900">
-            Create a new template
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form
-            ref={formRef}
-            action={formAction}
-            onSubmit={handleFormSubmit}
-            className="grid gap-4"
-            autoComplete="off"
+    <div className="grid items-start gap-6 @5xl:grid-cols-[minmax(0,1fr)_24rem]">
+      <section
+        ref={editorCardRef}
+        aria-label={editingTemplateId ? "Edit template" : "New template"}
+        className="scroll-mt-24 overflow-hidden rounded-xl border bg-card text-card-foreground shadow-xs motion-safe:animate-fade-in-up"
+      >
+        <header className="flex items-start justify-between gap-4 border-b px-5 py-4">
+          {/* A new key when switching between new and edit, so the title fades */}
+          <div
+            key={editingTemplateId ?? "new"}
+            className="min-w-0 space-y-1 motion-safe:animate-fade-in"
           >
-            {editingTemplateId ? (
-              <input
-                type="hidden"
-                name="templateId"
-                value={editingTemplateId}
-              />
-            ) : null}
+            <h2 className="flex items-center gap-2 text-base font-semibold tracking-tight">
+              {editingTemplateId ? "Edit template" : "New template"}
+              {editingTemplateId ? (
+                <span className="rounded-full bg-primary px-2 py-0.5 text-[11px] font-medium text-primary-foreground">
+                  Editing
+                </span>
+              ) : null}
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {editingTemplateId
+                ? "Your changes replace the saved version of this template."
+                : "Write a reusable email your team can send to leads."}
+            </p>
+          </div>
+        </header>
+
+        <form
+          ref={formRef}
+          action={formAction}
+          onSubmit={handleFormSubmit}
+          className="grid gap-5 px-5 pt-5"
+          autoComplete="off"
+        >
+          {editingTemplateId ? (
+            <input type="hidden" name="templateId" value={editingTemplateId} />
+          ) : null}
+
+          <div className="grid gap-5 @2xl:grid-cols-2">
             <div className="grid gap-2">
               <Label htmlFor="templateName">Template name</Label>
               <Input
@@ -1033,6 +1089,7 @@ const EmailTemplateManager = ({
                 required
                 value={templateName}
                 onChange={(event) => setTemplateName(event.target.value)}
+                className="h-10 bg-background"
               />
             </div>
 
@@ -1046,214 +1103,259 @@ const EmailTemplateManager = ({
                 required
                 value={subject}
                 onChange={(event) => setSubject(event.target.value)}
+                className="h-10 bg-background"
               />
             </div>
+          </div>
 
-            <div className="grid gap-2">
-              <Label>Email body</Label>
-              <input type="hidden" name="body" value={body} readOnly />
+          <div className="grid gap-2">
+            <Label>Email body</Label>
+            <input type="hidden" name="body" value={body} readOnly />
+            <div className="email-editor relative">
+              <EditorSkeleton className="email-editor-skeleton" />
               {isMounted ? (
                 <QuillEditor value={body} onChange={setBody} />
-              ) : (
-                <div className="flex min-h-[280px] items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
-                  <Spinner className="mr-2 text-slate-600" />
-                  <span className="text-sm text-slate-600">
-                    Initializing editor...
-                  </span>
-                </div>
-              )}
-              <p className="text-xs text-slate-500">
-                Format your email using the editor. Inline styles are stored for
-                HTML emails, a plain-text version is generated automatically,
-                and links open in a new tab. Use the table button for a 2-column
-                row and `Row+` to add more rows.
-              </p>
+              ) : null}
             </div>
-
-            {state.error ? (
-              <p className="text-sm text-rose-600">{state.error}</p>
-            ) : null}
-
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <Button
-                type="button"
-                variant="outline"
-                className="gap-2"
-                onClick={handlePreview}
-                disabled={isPending}
-              >
-                Preview
-              </Button>
-              <div className="flex items-center gap-2">
-                {editingTemplateId ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={handleCancelEdit}
-                    disabled={isPending}
-                  >
-                    Cancel edit
-                  </Button>
-                ) : null}
-                <Button type="submit" disabled={isPending}>
-                  {isPending ? (
-                    <>
-                      <Spinner className="mr-2 text-white" />
-                      {editingTemplateId ? "Updating..." : "Saving..."}
-                    </>
-                  ) : editingTemplateId ? (
-                    "Update template"
-                  ) : (
-                    "Save template"
-                  )}
-                </Button>
-              </div>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-
-      <Card className="border-slate-200 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-lg text-slate-900">
-            Recent templates
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {latestTemplates.length === 0 ? (
-            <p className="text-sm text-slate-600">
-              No templates saved yet. Create your first template using the form.
+            <p className="text-xs leading-relaxed text-muted-foreground">
+              Format your email using the editor. Inline styles are stored for
+              HTML emails, a plain-text version is generated automatically, and
+              links open in a new tab. Use the table button for a 2-column row
+              and `Row+` to add more rows.
             </p>
-          ) : (
-            <ul className="space-y-4">
-              {latestTemplates.map((template) => (
+          </div>
+
+          {state.error ? (
+            <p
+              role="alert"
+              className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive motion-safe:animate-fade-in"
+            >
+              {state.error}
+            </p>
+          ) : null}
+
+          <div className="-mx-5 flex flex-wrap items-center justify-between gap-3 border-t bg-muted/30 px-5 py-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="bg-background"
+              onClick={handlePreview}
+              disabled={isPending}
+            >
+              <Eye />
+              Preview
+            </Button>
+            <div className="flex items-center gap-2">
+              {editingTemplateId ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleCancelEdit}
+                  disabled={isPending}
+                >
+                  Cancel edit
+                </Button>
+              ) : null}
+              <Button type="submit" disabled={isPending} className="min-w-36">
+                {isPending ? (
+                  <>
+                    <Spinner />
+                    {editingTemplateId ? "Updating..." : "Saving..."}
+                  </>
+                ) : editingTemplateId ? (
+                  "Update template"
+                ) : (
+                  "Save template"
+                )}
+              </Button>
+            </div>
+          </div>
+        </form>
+      </section>
+
+      <section
+        aria-label="Saved templates"
+        className="overflow-hidden rounded-xl border bg-card text-card-foreground shadow-xs motion-safe:animate-fade-in-up @5xl:sticky @5xl:top-24"
+        style={{ animationDelay: "80ms" }}
+      >
+        <header className="flex items-start justify-between gap-3 border-b px-5 py-4">
+          <div className="space-y-1">
+            <h2 className="text-base font-semibold tracking-tight">
+              Templates
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Most recently updated first
+            </p>
+          </div>
+          <span className="rounded-full bg-foreground/[0.07] px-2 text-xs leading-5 tabular-nums text-muted-foreground">
+            {latestTemplates.length}
+          </span>
+        </header>
+
+        {latestTemplates.length === 0 ? (
+          <EmptyState
+            icon={FileText}
+            title="No templates yet"
+            description="Create your first template using the form."
+          />
+        ) : (
+          <ul className="divide-y @5xl:max-h-[calc(100vh-14rem)] @5xl:overflow-y-auto">
+            {latestTemplates.map((template, index) => {
+              const isEditing = editingTemplateId === template.id;
+              const isDeleting =
+                isDeletePending && deletingTemplateId === template.id;
+
+              return (
                 <li
                   key={template.id}
-                  className="rounded-lg border border-slate-200 p-4 shadow-sm"
+                  className={cn(
+                    "relative flex items-start gap-3 px-5 py-4 transition-[background-color,opacity] duration-200 hover:bg-muted/40 motion-safe:animate-fade-in-up",
+                    isEditing && "bg-muted/50 hover:bg-muted/50",
+                    isDeleting && "opacity-50"
+                  )}
+                  // The first templates fade in one after another
+                  style={{ animationDelay: `${120 + Math.min(index, 10) * 40}ms` }}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <h3 className="text-sm font-semibold text-slate-900">
-                        {template.templateName}
-                      </h3>
-                      <p className="mt-1 text-xs text-slate-500">
-                        Subject:{" "}
-                        <span className="font-medium text-slate-700">
-                          {template.subject}
-                        </span>
-                      </p>
-                      <p className="mt-2 text-xs text-slate-400">
-                        Updated {formatTimestamp(template.updatedAt)} UTC
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEditTemplate(template)}
-                        disabled={
-                          isPending ||
-                          (isDeletePending &&
-                            deletingTemplateId === template.id)
-                        }
-                        aria-label="Edit template"
-                      >
-                        <Pencil className="size-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="text-rose-500 hover:text-rose-600 focus-visible:ring-rose-500"
-                        onClick={() => handleDeleteTemplate(template.id)}
-                        disabled={
-                          isPending ||
-                          (isDeletePending &&
-                            deletingTemplateId === template.id)
-                        }
-                        aria-label="Delete template"
-                      >
-                        {isDeletePending &&
-                        deletingTemplateId === template.id ? (
-                          <Spinner className="text-rose-500" />
-                        ) : (
-                          <Trash2 className="size-4" />
-                        )}
-                      </Button>
-                    </div>
+                  {isEditing ? (
+                    <span
+                      aria-hidden="true"
+                      className="absolute inset-y-3 left-0 w-0.5 rounded-full bg-primary"
+                    />
+                  ) : null}
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      "flex size-9 shrink-0 items-center justify-center rounded-lg border transition-colors duration-200",
+                      isEditing
+                        ? "border-transparent bg-primary text-primary-foreground"
+                        : "bg-background text-muted-foreground"
+                    )}
+                  >
+                    <FileText className="size-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <h3 className="truncate text-sm font-medium">
+                      {template.templateName}
+                    </h3>
+                    <p className="truncate text-sm text-muted-foreground">
+                      {template.subject}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground/80">
+                      Updated {formatTimestamp(template.updatedAt)} UTC
+                    </p>
+                  </div>
+                  <div className="-mr-2 flex shrink-0 items-center gap-0.5">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-8 text-muted-foreground hover:text-foreground"
+                      onClick={() => {
+                        handleEditTemplate(template);
+                        revealEditor();
+                      }}
+                      disabled={isPending || isDeleting}
+                      aria-label="Edit template"
+                      title="Edit"
+                    >
+                      <Pencil />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="size-8 text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:ring-destructive"
+                      onClick={() => handleDeleteTemplate(template.id)}
+                      disabled={isPending || isDeleting}
+                      aria-label="Delete template"
+                      title="Delete"
+                    >
+                      {isDeleting ? <Spinner /> : <Trash2 />}
+                    </Button>
                   </div>
                 </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+              );
+            })}
+          </ul>
+        )}
+      </section>
 
-      {isPreviewOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-          <div className="max-h-full w-full max-w-3xl overflow-hidden rounded-xl bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">
-                  Preview —{" "}
-                  {normalizeHtml(body) ? "Template" : "Empty template"}
-                </h2>
-                <p className="text-xs text-slate-500">
+      <DialogPrimitive.Root
+        open={isPreviewOpen}
+        onOpenChange={(open) => {
+          if (!open) closePreview();
+        }}
+      >
+        <DialogPrimitive.Portal>
+          <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px] motion-safe:data-[state=closed]:animate-fade-out motion-safe:data-[state=open]:animate-fade-in" />
+          <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 flex max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border bg-background shadow-2xl outline-none motion-safe:data-[state=closed]:animate-dialog-out motion-safe:data-[state=open]:animate-dialog-in">
+            <div className="flex flex-wrap items-start justify-between gap-4 border-b px-6 py-4">
+              <div className="min-w-0 space-y-1">
+                <DialogPrimitive.Title className="text-lg font-semibold tracking-tight">
+                  Preview
+                </DialogPrimitive.Title>
+                <DialogPrimitive.Description className="text-sm text-muted-foreground">
                   Switch between HTML and plain-text views.
-                </p>
+                </DialogPrimitive.Description>
               </div>
               <div className="flex items-center gap-2">
-                <div className="inline-flex rounded-md border border-slate-200 bg-slate-100 p-0.5 text-xs">
-                  <button
+                <SegmentedControl
+                  label="Preview format"
+                  value={previewTab}
+                  onValueChange={setPreviewTab}
+                  options={[
+                    { value: "html", label: "HTML" },
+                    { value: "text", label: "Plain text" }
+                  ]}
+                  className="w-auto"
+                />
+                <DialogPrimitive.Close asChild>
+                  <Button
                     type="button"
-                    className={`rounded px-3 py-1 ${
-                      previewTab === "html"
-                        ? "bg-white text-slate-900 shadow-sm"
-                        : "text-slate-500"
-                    }`}
-                    onClick={() => setPreviewTab("html")}
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Close preview"
                   >
-                    HTML
-                  </button>
-                  <button
-                    type="button"
-                    className={`rounded px-3 py-1 ${
-                      previewTab === "text"
-                        ? "bg-white text-slate-900 shadow-sm"
-                        : "text-slate-500"
-                    }`}
-                    onClick={() => setPreviewTab("text")}
-                  >
-                    Plain text
-                  </button>
-                </div>
-                <Button type="button" variant="ghost" onClick={closePreview}>
-                  Close
-                </Button>
+                    <X />
+                  </Button>
+                </DialogPrimitive.Close>
               </div>
             </div>
-            <div className="max-h-[70vh] overflow-y-auto px-6 py-6">
+
+            <div className="min-h-0 flex-1 overflow-y-auto bg-muted/40 p-4 sm:p-6">
               {normalizeHtml(body) ? (
-                previewTab === "html" ? (
-                  <div
-                    className="prose max-w-none text-sm text-slate-800"
-                    dangerouslySetInnerHTML={{ __html: body }}
-                  />
-                ) : (
-                  <pre className="whitespace-pre-wrap rounded-lg bg-slate-100 p-4 text-sm text-slate-800">
-                    {renderTextPreview(body)}
-                  </pre>
-                )
+                // A new key per tab, so switching fades the content in
+                <div key={previewTab} className="motion-safe:animate-fade-in">
+                  {previewTab === "html" ? (
+                    <div className="mx-auto max-w-[640px] overflow-hidden rounded-lg border bg-white shadow-xs">
+                      <div className="border-b px-6 py-3 text-sm">
+                        <span className="text-muted-foreground">Subject: </span>
+                        <span className="font-medium">
+                          {subject || "(No subject)"}
+                        </span>
+                      </div>
+                      <div className="ql-snow">
+                        <div
+                          className="ql-editor email-preview"
+                          dangerouslySetInnerHTML={{ __html: body }}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <pre className="mx-auto max-w-[640px] whitespace-pre-wrap break-words rounded-lg border bg-background p-5 font-mono text-[13px] leading-relaxed">
+                      {renderTextPreview(body)}
+                    </pre>
+                  )}
+                </div>
               ) : (
-                <p className="text-sm text-slate-500">
+                <p className="text-sm text-muted-foreground">
                   Add content in the editor to preview it here.
                 </p>
               )}
             </div>
-          </div>
-        </div>
-      ) : null}
+          </DialogPrimitive.Content>
+        </DialogPrimitive.Portal>
+      </DialogPrimitive.Root>
     </div>
   );
 };

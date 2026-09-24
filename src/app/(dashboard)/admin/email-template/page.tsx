@@ -1,4 +1,5 @@
 import EmailTemplateManager from "./ui/email-template-manager";
+import EmailTemplatesHeader from "./ui/email-templates-header";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 const EmailTemplateAdminPage = async () => {
@@ -23,16 +24,8 @@ const EmailTemplateAdminPage = async () => {
     })) ?? [];
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-semibold text-slate-900">
-          Email Templates
-        </h1>
-        <p className="mt-2 text-sm text-slate-600">
-          Create and manage reusable outbound email templates for your team.
-        </p>
-      </div>
-
+    <div className="@container space-y-6">
+      <EmailTemplatesHeader />
       <EmailTemplateManager initialTemplates={templates} />
     </div>
   );

@@ -55,6 +55,8 @@
   --animate-fade-out: fade-out 0.2s ease-in forwards;
   --animate-sheet-in: sheet-in 0.45s var(--ease-out-expo);
   --animate-sheet-out: sheet-out 0.25s ease-in forwards;
+  --animate-dialog-in: dialog-in 0.3s var(--ease-out-expo);
+  --animate-dialog-out: dialog-out 0.15s ease-in forwards;
 
   @keyframes fade-in {
     from {
@@ -77,6 +79,20 @@
   @keyframes sheet-out {
     to {
       translate: 100% 0;
+    }
+  }
+
+  @keyframes dialog-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.97);
+    }
+  }
+
+  @keyframes dialog-out {
+    to {
+      opacity: 0;
+      transform: translateY(4px) scale(0.98);
     }
   }
 
