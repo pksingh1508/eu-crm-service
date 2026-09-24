@@ -125,3 +125,100 @@ export const getLeadsPage = async ({
 }
 
 export type LeadsPage = Awaited<ReturnType<typeof getLeadsPage>>
+
+export type TeamLeadListItem = {
+  id: string
+  name: string
+  email: string | null
+  phone: string | null
+  status: string | null
+  updated_at: string
+}
+
+const TEAM_LEAD_COLUMNS = "id, name, email, phone, status, updated_at"
+
+type TeamLeadGroup = "new" | "email-send"
+
+// A team member's leads: every new lead (waiting for a first email), then the
+// leads they emailed. Each group shows the latest change first, so a lead that
+// fills in the form again is back at the top of the new leads.
+export const getTeamLeadsPage = async (
+  { query, status, page, pageSize }: LeadsSearchParams,
+  // The team member's email address, which is saved as "Sent by"
+  sentBy: string | null
+) => {
+  const supabase = getSupabaseAdminClient()
+  const groups: TeamLeadGroup[] =
+    status === "all" ? ["new", "email-send"] : [status]
+  const offset = (page - 1) * pageSize
+
+  const selectGroup = (group: TeamLeadGroup, { head }: { head: boolean }) => {
+    let builder = supabase
+      .from("leads")
+      .select(head ? "id" : TEAM_LEAD_COLUMNS, {
+        count: head ? "exact" : undefined,
+        head
+      })
+      .eq("status", group)
+
+    if (group === "email-send") {
+      // Without an email address there are no emails of theirs to match
+      builder = sentBy ? builder.eq("send_by", sentBy) : builder.is("id", null)
+    }
+
+    return query
+      ? builder.or(containsAny(["name", "email", "phone", "company"], query))
+      : builder
+  }
+
+  const countGroup = async (group: TeamLeadGroup) => {
+    const { count, error } = await selectGroup(group, { head: true })
+
+    if (error) throw toError(error)
+    return count ?? 0
+  }
+
+  const fetchGroup = async (group: TeamLeadGroup, from: number, to: number) => {
+    const { data, error } = await selectGroup(group, { head: false })
+      .order("updated_at", { ascending: false })
+      // Tie-breaker, so rows with the same timestamp never move between pages
+      .order("id", { ascending: false })
+      .range(from, to)
+
+    if (error) throw toError(error)
+    return (data ?? []) as unknown as TeamLeadListItem[]
+  }
+
+  // The counts (also used by the status tabs) and the first group's rows are
+  // fetched together; a page inside the first group needs nothing more.
+  const [newCount, emailSentCount, firstGroupLeads] = await Promise.all([
+    countGroup("new"),
+    countGroup("email-send"),
+    fetchGroup(groups[0], offset, offset + pageSize - 1)
+  ])
+
+  const groupCounts: Record<TeamLeadGroup, number> = {
+    new: newCount,
+    "email-send": emailSentCount
+  }
+  const total = groups.reduce((sum, group) => sum + groupCounts[group], 0)
+
+  // On "All", a page can run on from the new leads into the emailed ones
+  const emailSentFrom = Math.max(0, offset - newCount)
+  const emailSentTo = Math.min(emailSentCount, offset + pageSize - newCount) - 1
+  const emailSentLeads =
+    status === "all" && emailSentTo >= emailSentFrom
+      ? await fetchGroup("email-send", emailSentFrom, emailSentTo)
+      : []
+
+  return {
+    leads: [...firstGroupLeads, ...emailSentLeads],
+    total,
+    pageCount: Math.max(1, Math.ceil(total / pageSize)),
+    statusCounts: {
+      all: newCount + emailSentCount,
+      new: newCount,
+      "email-send": emailSentCount
+    }
+  }
+}

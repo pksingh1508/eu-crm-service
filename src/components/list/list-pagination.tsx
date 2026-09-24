@@ -125,7 +125,10 @@ const ListPagination = ({
 
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <span className="hidden @lg:inline">Rows per page</span>
+          {/* Left out where the footer first fits on one row, so nothing wraps */}
+          <span className="hidden @lg:inline @2xl:hidden @3xl:inline">
+            Rows per page
+          </span>
           <Select
             value={String(pageSize)}
             onValueChange={(value) => {

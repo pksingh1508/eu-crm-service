@@ -52,3 +52,9 @@ export const parseLeadsSearchParams = (
 
 export const buildLeadsHref = (params: LeadsSearchParams) =>
   buildListHref(LEADS_PATH, params, LEADS_DEFAULTS)
+
+// A team member's list ("My leads") uses the same search params
+export const TEAM_LEADS_PATH = "/team/leads"
+
+export const buildTeamLeadsHref = (params: LeadsSearchParams) =>
+  buildListHref(TEAM_LEADS_PATH, params, LEADS_DEFAULTS)
