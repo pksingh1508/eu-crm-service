@@ -1,6 +1,7 @@
 "use client"
 
-import { ChevronDown, ChevronUp, X } from "lucide-react"
+import Link, { useLinkStatus } from "next/link"
+import { ArrowRight, ChevronDown, ChevronUp, X } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -10,6 +11,7 @@ import {
   SheetDescription,
   SheetTitle
 } from "@/components/ui/sheet"
+import { Spinner } from "@/components/ui/spinner"
 import type { EmailActivityItem, Person } from "@/server/email-activity/queries"
 
 const DetailRow = ({
@@ -43,6 +45,17 @@ const PersonValue = ({
     <span className="text-muted-foreground">{fallback}</span>
   )
 
+// Turns into a spinner while the lead's page loads
+const OpenLeadIcon = () => {
+  const { pending } = useLinkStatus()
+
+  return pending ? (
+    <Spinner aria-hidden="true" />
+  ) : (
+    <ArrowRight aria-hidden="true" />
+  )
+}
+
 type EmailDetailsSheetProps = {
   item: EmailActivityItem | null
   open: boolean
@@ -51,6 +64,9 @@ type EmailDetailsSheetProps = {
   onPrevious?: () => void
   onNext?: () => void
   onCloseAutoFocus?: (event: Event) => void
+  showSender?: boolean
+  // The lead's page, for a button that opens it
+  leadHref?: string
 }
 
 // The full email, sliding in from the right when a row is clicked
@@ -60,7 +76,9 @@ const EmailDetailsSheet = ({
   onOpenChange,
   onPrevious,
   onNext,
-  onCloseAutoFocus
+  onCloseAutoFocus,
+  showSender = true,
+  leadHref
 }: EmailDetailsSheetProps) => (
   <Sheet open={open} onOpenChange={onOpenChange}>
     <SheetContent onCloseAutoFocus={onCloseAutoFocus}>
@@ -118,9 +136,11 @@ const EmailDetailsSheet = ({
               <DetailRow label="From">
                 <PersonValue person={item.mailbox} fallback="Unknown mailbox" />
               </DetailRow>
-              <DetailRow label="Sent by">
-                <PersonValue person={item.sender} fallback="Unknown sender" />
-              </DetailRow>
+              {showSender ? (
+                <DetailRow label="Sent by">
+                  <PersonValue person={item.sender} fallback="Unknown sender" />
+                </DetailRow>
+              ) : null}
             </dl>
 
             <div className="rounded-lg border bg-muted/30 px-4 py-3.5">
@@ -135,6 +155,17 @@ const EmailDetailsSheet = ({
               )}
             </div>
           </div>
+
+          {leadHref ? (
+            <div className="flex justify-end border-t px-6 py-3">
+              <Button asChild variant="outline" size="sm">
+                <Link href={leadHref}>
+                  Open lead
+                  <OpenLeadIcon />
+                </Link>
+              </Button>
+            </div>
+          ) : null}
         </>
       ) : null}
     </SheetContent>

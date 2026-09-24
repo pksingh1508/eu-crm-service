@@ -1,5 +1,7 @@
 import { redirect } from "next/navigation"
 
+import EmailActivityTable from "@/components/email-activity/email-activity-table"
+import RangeFilter from "@/components/email-activity/range-filter"
 import ListPagination from "@/components/list/list-pagination"
 import ListResults from "@/components/list/list-results"
 import ListSearch from "@/components/list/list-search"
@@ -13,8 +15,6 @@ import {
 import { getEmailActivityPage } from "@/server/email-activity/queries"
 
 import EmailActivityHeader from "./ui/email-activity-header"
-import EmailActivityTable from "./ui/email-activity-table"
-import RangeFilter from "./ui/range-filter"
 import SenderFilter from "./ui/sender-filter"
 
 const EmailActivityPage = async ({

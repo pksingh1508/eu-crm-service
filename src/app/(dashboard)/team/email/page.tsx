@@ -1,135 +1,82 @@
-﻿import { redirect } from "next/navigation";
+import { redirect } from "next/navigation"
 
-import DataTable from "@/components/ui/data-table";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { getSupabaseServerClient } from "@/lib/supabase/server";
-import { getSupabaseAdminClient } from "@/lib/supabase/admin";
+import EmailActivityTable from "@/components/email-activity/email-activity-table"
+import RangeFilter from "@/components/email-activity/range-filter"
+import ListPagination from "@/components/list/list-pagination"
+import ListResults from "@/components/list/list-results"
+import ListSearch from "@/components/list/list-search"
+import { UrlStateProvider } from "@/components/list/url-state"
+import {
+  buildTeamEmailHref,
+  parseTeamEmailSearchParams,
+  TEAM_EMAIL_DEFAULTS,
+  TEAM_EMAIL_PATH
+} from "@/lib/email-activity"
+import { getSupabaseServerClient } from "@/lib/supabase/server"
+import { getTeamEmailsPage } from "@/server/email-activity/queries"
 
-type EmailEventRow = {
-  id: string;
-  created_at: string;
-  lead: {
-    name: string | null;
-    email: string | null;
-  } | null;
-  payload: Record<string, any> | null;
-};
-
-type SearchParams = {
-  query?: string;
-};
+import TeamEmailHeader from "./ui/team-email-header"
 
 const EmailCenterPage = async ({
-  searchParams,
+  searchParams
 }: {
-  searchParams: Promise<SearchParams>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>
 }) => {
-  const resolvedSearchParams = await searchParams;
-  const supabase = await getSupabaseServerClient();
+  const params = parseTeamEmailSearchParams(await searchParams)
+  const supabase = await getSupabaseServerClient()
   const {
     data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
+    error: userError
+  } = await supabase.auth.getUser()
 
   if (userError) {
-    console.error("[email-center] failed to verify auth user", userError);
+    console.error("[email-center] failed to verify auth user", userError)
   }
 
   if (!user) {
-    redirect("/login");
+    redirect("/login")
   }
 
-  const supabaseAdmin = getSupabaseAdminClient();
-  const { data: eventsData } = await supabaseAdmin
-    .from("lead_events")
-    .select("id, created_at, payload, lead:lead_id(name,email)")
-    .eq("event_type", "email_sent")
-    .eq("actor_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(50);
+  // Errors are shown by error.tsx, with a "Try again" button
+  const { items, total, pageCount } = await getTeamEmailsPage(params, user.id)
 
-  const events = (eventsData ?? []) as unknown as EmailEventRow[];
-
-  const query = resolvedSearchParams.query?.trim().toLowerCase() ?? "";
-  const filteredEvents =
-    query.length === 0
-      ? events
-      : events.filter((event) => {
-          const haystacks = [
-            event.lead?.name ?? "",
-            event.lead?.email ?? "",
-            event.payload?.subject ?? "",
-          ];
-          return haystacks.some((value) => value.toLowerCase().includes(query));
-        });
+  // e.g. an old link to a page past the end, after a new search
+  if (params.page > pageCount) {
+    redirect(buildTeamEmailHref({ ...params, page: pageCount }))
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-semibold text-slate-900">Email center</h1>
-        <p className="text-sm text-slate-600">
-          Review every email you have sent through the CRM.
-        </p>
-      </div>
+    <UrlStateProvider
+      pathname={TEAM_EMAIL_PATH}
+      params={params}
+      defaults={TEAM_EMAIL_DEFAULTS}
+    >
+      <div className="@container space-y-6">
+        <TeamEmailHeader />
 
-      <form
-        method="GET"
-        className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm md:flex-row md:items-end"
-      >
-        <div className="flex-1">
-          <label htmlFor="query" className="text-sm font-medium text-slate-700">
-            Search
-          </label>
-          <Input
-            id="query"
-            name="query"
-            defaultValue={resolvedSearchParams.query ?? ""}
-            placeholder="Search by lead or subject..."
-            className="mt-1"
+        <div className="flex flex-col gap-3 @3xl:flex-row @3xl:items-center @3xl:justify-between">
+          <ListSearch
+            placeholder="Lead name or email"
+            label="Search emails"
+            className="@3xl:max-w-sm"
           />
+          <RangeFilter />
         </div>
-        <Button type="submit" className="md:w-auto">
-          Search
-        </Button>
-        <Button variant="outline" asChild className="md:w-auto">
-          <a href="/team/email">Reset</a>
-        </Button>
-      </form>
 
-      <DataTable
-        columns={[
-          {
-            key: "created_at",
-            header: "Sent at",
-            render: (row) => new Date(row.created_at).toLocaleString(),
-          },
-          {
-            key: "lead",
-            header: "Lead",
-            render: (row) => (
-              <div className="flex flex-col">
-                <span className="text-sm font-semibold text-slate-900">
-                  {row.lead?.name ?? "Unknown"}
-                </span>
-                <span className="text-xs text-slate-500">
-                  {row.lead?.email ?? "—"}
-                </span>
-              </div>
-            ),
-          },
-          {
-            key: "payload",
-            header: "Subject",
-            render: (row) => row.payload?.subject ?? "—",
-          },
-        ]}
-        data={filteredEvents}
-        emptyMessage="No email activity yet."
-        rowKey={(row) => row.id}
-      />
-    </div>
-  );
-};
+        <ListResults label="Sent emails">
+          <EmailActivityTable
+            items={items}
+            resultKey={buildTeamEmailHref(params)}
+            hasFilters={params.query !== "" || params.range !== "all"}
+            scope="own"
+          />
+          {total > 0 ? (
+            <ListPagination total={total} pageCount={pageCount} />
+          ) : null}
+        </ListResults>
+      </div>
+    </UrlStateProvider>
+  )
+}
 
-export default EmailCenterPage;
+export default EmailCenterPage

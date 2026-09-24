@@ -4,11 +4,14 @@ import { useUrlState } from "@/components/list/url-state"
 import SegmentedControl from "@/components/ui/segmented-control"
 import {
   EMAIL_ACTIVITY_RANGES,
-  type EmailActivitySearchParams
+  type EmailActivityRange
 } from "@/lib/email-activity"
 
 const RangeFilter = () => {
-  const { params, navigate } = useUrlState<EmailActivitySearchParams>()
+  const { params, navigate } = useUrlState<{
+    range: EmailActivityRange
+    page: number
+  }>()
 
   return (
     <SegmentedControl

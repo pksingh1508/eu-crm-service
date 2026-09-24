@@ -63,3 +63,31 @@ export const parseEmailActivitySearchParams = (
 
 export const buildEmailActivityHref = (params: EmailActivitySearchParams) =>
   buildListHref(EMAIL_ACTIVITY_PATH, params, EMAIL_ACTIVITY_DEFAULTS)
+
+// A team member's own emails (Email center): the same params, minus the sender
+export type TeamEmailSearchParams = Omit<EmailActivitySearchParams, "member">
+
+export const TEAM_EMAIL_PATH = "/team/email"
+
+export const TEAM_EMAIL_DEFAULTS: TeamEmailSearchParams = {
+  query: "",
+  range: "all",
+  page: 1,
+  pageSize: DEFAULT_PAGE_SIZE
+}
+
+export const parseTeamEmailSearchParams = (
+  raw: RawSearchParams
+): TeamEmailSearchParams => ({
+  query: parseQuery(raw.query),
+  range: parseOption(
+    raw.range,
+    EMAIL_ACTIVITY_RANGES.map((range) => range.value),
+    "all"
+  ),
+  page: parsePage(raw.page),
+  pageSize: parsePageSize(raw.pageSize)
+})
+
+export const buildTeamEmailHref = (params: TeamEmailSearchParams) =>
+  buildListHref(TEAM_EMAIL_PATH, params, TEAM_EMAIL_DEFAULTS)

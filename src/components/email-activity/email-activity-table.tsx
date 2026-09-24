@@ -6,6 +6,7 @@ import { useState } from "react"
 import ClearFiltersButton from "@/components/list/clear-filters-button"
 import EmptyState from "@/components/ui/empty-state"
 import InitialsAvatar from "@/components/ui/initials-avatar"
+import { Skeleton } from "@/components/ui/skeleton"
 import { cn } from "@/lib/utils"
 import type { EmailActivityItem } from "@/server/email-activity/queries"
 
@@ -17,7 +18,29 @@ import {
 } from "./columns"
 import EmailDetailsSheet from "./email-details-sheet"
 
-export const EmailActivityTableHead = () => (
+// "all": everyone's emails, for admins. "own": a team member's own emails, so
+// there's no Sent by column, and each email links to its lead.
+export type EmailActivityScope = "all" | "own"
+
+const emptyTexts: Record<
+  EmailActivityScope,
+  { filtered: string; none: string }
+> = {
+  all: {
+    filtered: "Try another search, sender or date range.",
+    none: "Emails your team sends to leads will show up here."
+  },
+  own: {
+    filtered: "Try another search or date range.",
+    none: "Emails you send to leads will show up here."
+  }
+}
+
+export const EmailActivityTableHead = ({
+  scope = "all"
+}: {
+  scope?: EmailActivityScope
+}) => (
   <thead className="hidden border-b bg-muted/40 @2xl:table-header-group">
     <tr>
       <th scope="col" className={cn(headCellClassName, columns.lead)}>
@@ -26,9 +49,11 @@ export const EmailActivityTableHead = () => (
       <th scope="col" className={headCellClassName}>
         Email
       </th>
-      <th scope="col" className={cn(headCellClassName, columns.sender)}>
-        Sent by
-      </th>
+      {scope === "all" ? (
+        <th scope="col" className={cn(headCellClassName, columns.sender)}>
+          Sent by
+        </th>
+      ) : null}
       <th scope="col" className={cn(headCellClassName, columns.sent)}>
         Sent
       </th>
@@ -39,11 +64,13 @@ export const EmailActivityTableHead = () => (
 const EmailRow = ({
   item,
   index,
+  showSender,
   isActive,
   onOpen
 }: {
   item: EmailActivityItem
   index: number
+  showSender: boolean
   isActive: boolean
   onOpen: () => void
 }) => (
@@ -98,18 +125,20 @@ const EmailRow = ({
         </div>
       </div>
     </td>
-    <td className={cn(cellClassName, columns.sender)}>
-      {item.sender ? (
-        <div className="flex max-w-56 items-center gap-2">
-          <InitialsAvatar name={item.sender.name} />
-          <span className="truncate text-foreground/80">
-            {item.sender.name}
-          </span>
-        </div>
-      ) : (
-        <span className="text-muted-foreground">Unknown</span>
-      )}
-    </td>
+    {showSender ? (
+      <td className={cn(cellClassName, columns.sender)}>
+        {item.sender ? (
+          <div className="flex max-w-56 items-center gap-2">
+            <InitialsAvatar name={item.sender.name} />
+            <span className="truncate text-foreground/80">
+              {item.sender.name}
+            </span>
+          </div>
+        ) : (
+          <span className="text-muted-foreground">Unknown</span>
+        )}
+      </td>
+    ) : null}
     <td className={cn(cellClassName, columns.sent)}>
       <time
         dateTime={item.sentAt}
@@ -127,12 +156,14 @@ type EmailActivityTableProps = {
   // Changes with every new result, so the rows fade in again
   resultKey: string
   hasFilters: boolean
+  scope?: EmailActivityScope
 }
 
 const EmailActivityTable = ({
   items,
   resultKey,
-  hasFilters
+  hasFilters,
+  scope = "all"
 }: EmailActivityTableProps) => {
   const [activeId, setActiveId] = useState<string | null>(null)
   const [isOpen, setIsOpen] = useState(false)
@@ -142,7 +173,7 @@ const EmailActivityTable = ({
       <EmptyState
         icon={SearchX}
         title="No emails match your filters"
-        description="Try another search, sender or date range."
+        description={emptyTexts[scope].filtered}
       >
         <ClearFiltersButton />
       </EmptyState>
@@ -150,7 +181,7 @@ const EmailActivityTable = ({
       <EmptyState
         icon={MailX}
         title="No emails sent yet"
-        description="Emails your team sends to leads will show up here."
+        description={emptyTexts[scope].none}
       />
     )
   }
@@ -163,13 +194,14 @@ const EmailActivityTable = ({
     <>
       <table className="w-full text-sm">
         <caption className="sr-only">Sent emails, newest first</caption>
-        <EmailActivityTableHead />
+        <EmailActivityTableHead scope={scope} />
         <tbody key={resultKey}>
           {items.map((item, index) => (
             <EmailRow
               key={item.id}
               item={item}
               index={index}
+              showSender={scope === "all"}
               isActive={isOpen && item.id === activeId}
               onOpen={() => {
                 setActiveId(item.id)
@@ -201,9 +233,73 @@ const EmailActivityTable = ({
             .querySelector<HTMLElement>(`[data-email-id="${activeId}"]`)
             ?.focus()
         }}
+        showSender={scope === "all"}
+        leadHref={
+          scope === "own" && activeItem?.leadId
+            ? `/team/leads/${activeItem.leadId}`
+            : undefined
+        }
       />
     </>
   )
 }
+
+export const EmailActivityTableSkeleton = ({
+  scope = "all"
+}: {
+  scope?: EmailActivityScope
+}) => (
+  <table className="w-full text-sm">
+    <EmailActivityTableHead scope={scope} />
+    <tbody>
+      {Array.from({ length: 12 }, (_, index) => (
+        <tr key={index} className="border-b last:border-b-0">
+          <td className={cn(cellClassName, columns.lead)}>
+            <div className="flex items-center gap-3">
+              <Skeleton className="size-8 shrink-0 rounded-full" />
+              {/* As wide as a lead's email usually is, so the columns don't
+                  move when the emails appear */}
+              <div className="w-40 @4xl:w-52">
+                <div className="flex h-5 items-center">
+                  <Skeleton className="h-3.5 w-28" />
+                </div>
+                <div className="flex h-4 items-center">
+                  <Skeleton className="h-3 w-36 @4xl:w-44" />
+                </div>
+              </div>
+            </div>
+          </td>
+          <td className={emailCellClassName}>
+            <div className="flex items-start gap-3">
+              <Skeleton className="size-8 shrink-0 rounded-full @2xl:hidden" />
+              <div className="min-w-0 flex-1">
+                <div className="flex h-5 items-center @2xl:hidden">
+                  <Skeleton className="h-3.5 w-28 max-w-full" />
+                </div>
+                <div className="flex h-5 items-center">
+                  <Skeleton className="h-3.5 w-56 max-w-full" />
+                </div>
+                <div className="flex h-4 items-center">
+                  <Skeleton className="h-3 w-80 max-w-full" />
+                </div>
+              </div>
+            </div>
+          </td>
+          {scope === "all" ? (
+            <td className={cn(cellClassName, columns.sender)}>
+              <div className="flex items-center gap-2">
+                <Skeleton className="size-8 shrink-0 rounded-full" />
+                <Skeleton className="h-3.5 w-24" />
+              </div>
+            </td>
+          ) : null}
+          <td className={cn(cellClassName, columns.sent)}>
+            <Skeleton className="ml-auto h-3.5 w-24" />
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+)
 
 export default EmailActivityTable
